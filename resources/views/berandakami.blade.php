@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <title>Beranda Kami - Sistem Apotek</title>
+    <link rel="preconnect" href="https://fonts.bunny.net">
+    <link href="https://fonts.bunny.net/css?family=figtree:400,500,600&display=swap" rel="stylesheet" />
+    @vite(['resources/css/app.css', 'resources/js/app.jsx'])
+</head>
+<body class="font-sans antialiased bg-gray-100 dark:bg-gray-900">
+<main class="min-h-screen py-10">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="mb-4 flex items-center justify-between">
+            <div>
+                <p class="text-sm text-gray-500">Halo, selamat datang di</p>
+                <h1 class="text-3xl font-bold text-gray-900 dark:text-white">Apotek Kami</h1>
+            </div>
+            <a href="/" class="text-sm font-semibold text-blue-600 hover:text-blue-700">Kembali</a>
+        </div>
+
+        <div id="berandakami-root"></div>
+        <noscript class="mt-4 block rounded-lg bg-yellow-50 p-4 text-sm text-yellow-800">
+            Aktifkan JavaScript untuk melihat tampilan dashboard.
+        </noscript>
+    </div>
+</main>
+</body>
+</html>
+
