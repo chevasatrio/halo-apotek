@@ -19,7 +19,7 @@ class CartManager {
     addToCart(product) {
         console.log('🛒 CartManager: Adding product to cart', product);
         const existingItem = this.cart.find(item => item.id === product.id);
-        
+
         if (existingItem) {
             if (existingItem.quantity >= product.stock) {
                 alert('Stok tidak mencukupi!');
@@ -38,7 +38,7 @@ class CartManager {
             });
             console.log('🛒 CartManager: Added new item to cart');
         }
-        
+
         this.saveCart();
         this.showNotification('Produk ditambahkan ke keranjang!');
         console.log('🛒 CartManager: Cart updated', this.cart);
@@ -145,30 +145,36 @@ class CartManager {
 
     showModal(title, content) {
         // Create modal if it doesn't exist
-        let modal = document.getElementById('cartModal');
-        if (!modal) {
-            modal = document.createElement('div');
-            modal.id = 'cartModal';
-            modal.className = 'modal fade';
-            modal.innerHTML = `
+        let modalElement = document.getElementById('cartModal');
+
+        if (!modalElement) {
+            modalElement = document.createElement('div');
+            modalElement.id = 'cartModal';
+            modalElement.className = 'modal fade';
+            modalElement.innerHTML = `
                 <div class="modal-dialog modal-lg">
                     <div class="modal-content">
                         <div class="modal-header">
-                            <h5 class="modal-title">${title}</h5>
+                            <h5 class="modal-title"></h5>
                             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                         </div>
-                        <div class="modal-body" id="cartModalBody">
-                            ${content}
-                        </div>
+                        <div class="modal-body" id="cartModalBody"></div>
                     </div>
                 </div>
             `;
-            document.body.appendChild(modal);
-        } else {
-            document.getElementById('cartModalBody').innerHTML = content;
+            document.body.appendChild(modalElement);
         }
 
-        const bsModal = new bootstrap.Modal(modal);
+        // Update content
+        modalElement.querySelector('.modal-title').innerText = title;
+        document.getElementById('cartModalBody').innerHTML = content;
+
+        // Manage Bootstrap Modal Instance
+        let bsModal = bootstrap.Modal.getInstance(modalElement);
+        if (!bsModal) {
+            bsModal = new bootstrap.Modal(modalElement);
+        }
+
         bsModal.show();
     }
 
@@ -178,16 +184,8 @@ class CartManager {
             return;
         }
 
-        // Check if user is logged in
-        const token = localStorage.getItem('auth_token');
-        if (!token) {
-            alert('Silakan login terlebih dahulu untuk checkout!');
-            return;
-        }
-
-        // Here you would typically send the cart to your API
-        alert('Fitur checkout akan mengirim data ke API. Pastikan Anda sudah login!');
-        console.log('Cart data:', this.cart);
+        // Redirect to checkout page - Middleware will handle authentication
+        window.location.href = '/checkout';
     }
 
     showNotification(message) {
@@ -199,7 +197,7 @@ class CartManager {
             <i class="fas fa-check-circle me-2"></i>${message}
         `;
         document.body.appendChild(notification);
-        
+
         setTimeout(() => {
             notification.remove();
         }, 3000);

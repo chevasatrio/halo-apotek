@@ -12,6 +12,13 @@ export default defineConfig({
         }),
         react(),
     ],
+    server: {
+        host: '127.0.0.1',
+        hmr: {
+            host: 'localhost',
+        },
+    },
+
     resolve: {
         alias: {
             '@': '/resources/js',

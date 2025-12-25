@@ -217,20 +217,11 @@
                 return;
             }
 
-            // Check if user is logged in
-            const token = localStorage.getItem('auth_token');
-            if (!token) {
-                alert('Silakan login terlebih dahulu untuk checkout!');
-                window.location.href = '/login';
-                return;
-            }
-
-            // Submit to API
-            fetch('/api/checkout', {
+            // Submit to Backend (Session Based)
+            fetch('{{ route("checkout.process") }}', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': 'Bearer ' + token,
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
                 },
                 body: JSON.stringify(formData)
@@ -242,15 +233,16 @@
                     // Clear cart
                     window.cartManager.cart = [];
                     window.cartManager.saveCart();
-                    // Redirect to order confirmation or home
-                    window.location.href = '{{ route("beranda") }}';
+                    // Redirect
+                    window.location.href = data.redirect_url || '{{ route("beranda") }}';
                 } else {
                     alert('Checkout gagal: ' + (data.error || data.message));
+                    console.error('Error Details:', data);
                 }
             })
             .catch(error => {
                 console.error('Error:', error);
-                alert('Terjadi kesalahan saat checkout. Silakan coba lagi.');
+                alert('Terjadi kesalahan saat checkout. Silakan cek console untuk detail.');
             });
         });
 
