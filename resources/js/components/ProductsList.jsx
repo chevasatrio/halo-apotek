@@ -5,7 +5,6 @@ const ProductsList = ({ products: initialProducts }) => {
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
-        // Fetch products from API if not provided
         if (!products || products.length === 0) {
             fetchProducts();
         }
@@ -40,6 +39,17 @@ const ProductsList = ({ products: initialProducts }) => {
         }
     };
 
+    const handleProductClick = (productId) => {
+        window.location.href = `/produk/${productId}`;
+    };
+
+    const getImageUrl = (image) => {
+        if (!image) return '/default-product.png';
+        if (image.startsWith('http')) return image;
+        if (image.includes('products/')) return `/storage/${image}`;
+        return `/storage/products/${image}`;
+    };
+
     if (loading) {
         return (
             <div className="text-center py-5">
@@ -59,43 +69,36 @@ const ProductsList = ({ products: initialProducts }) => {
         );
     }
 
-    const handleProductClick = (productId) => {
-        window.location.href = `/produk/${productId}`;
-    };
-
     return (
         <div className="row g-4">
             {products.map((product) => (
                 <div key={product.id} className="col-md-4 col-lg-3">
                     <div className="card product-card">
-                        <div 
-                            className="position-relative" 
+                        
+                        <div
+                            className="position-relative"
                             style={{ cursor: 'pointer' }}
                             onClick={() => handleProductClick(product.id)}
                         >
-                            {product.image ? (
-                                <img 
-                                    src={product.image.startsWith('http') ? product.image : `/storage/${product.image}`}
-                                    alt={product.name}
-                                    className="product-image"
-                                    onError={(e) => {
-                                        e.target.src = 'https://via.placeholder.com/300x250?text=No+Image';
-                                    }}
-                                />
-                            ) : (
-                                <div className="product-image d-flex align-items-center justify-content-center bg-light">
-                                    <i className="fas fa-pills fa-4x text-muted"></i>
-                                </div>
-                            )}
+                            <img
+                                src={getImageUrl(product.image)}
+                                alt={product.name}
+                                className="product-image"
+                                onError={(e) => {
+                                    e.target.src = 'https://via.placeholder.com/300x250?text=No+Image';
+                                }}
+                            />
+
                             {product.stock === 0 && (
                                 <div className="position-absolute top-0 end-0 m-2">
                                     <span className="badge bg-danger">Habis</span>
                                 </div>
                             )}
                         </div>
+
                         <div className="card-body">
-                            <h5 
-                                className="product-name" 
+                            <h5
+                                className="product-name"
                                 style={{ cursor: 'pointer' }}
                                 onClick={() => handleProductClick(product.id)}
                             >
@@ -126,4 +129,3 @@ const ProductsList = ({ products: initialProducts }) => {
 };
 
 export default ProductsList;
-

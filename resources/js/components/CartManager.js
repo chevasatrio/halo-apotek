@@ -18,6 +18,18 @@ class CartManager {
 
     addToCart(product) {
         console.log('🛒 CartManager: Adding product to cart', product);
+
+        // 🧠 FIX GAMBAR → pastikan selalu disimpan sebagai URL publik Laravel
+        if (product.image) {
+            // jika hanya nama file → tambahkan path
+            if (!product.image.startsWith('/storage')) {
+                product.image = "/storage/products/" + product.image;
+            }
+        } else {
+            // fallback jika tidak ada gambar
+            product.image = "/default-product.png";
+        }
+
         const existingItem = this.cart.find(item => item.id === product.id);
 
         if (existingItem) {
@@ -99,10 +111,13 @@ class CartManager {
 
         const itemsHtml = this.cart.map(item => `
             <div class="d-flex align-items-center mb-3 p-3 border rounded">
+                <img src="${item.image}" alt="${item.name}" class="rounded me-3" style="width:80px; height:80px; object-fit:cover;">
+                
                 <div class="flex-grow-1">
                     <h6 class="mb-1">${item.name}</h6>
                     <p class="mb-0 text-muted">${this.formatPrice(item.price)} x ${item.quantity}</p>
                 </div>
+
                 <div class="d-flex align-items-center me-3">
                     <button class="btn btn-sm btn-outline-secondary" onclick="window.cartManager.updateQuantity(${item.id}, ${item.quantity - 1})">
                         <i class="fas fa-minus"></i>
@@ -112,9 +127,11 @@ class CartManager {
                         <i class="fas fa-plus"></i>
                     </button>
                 </div>
+
                 <div class="text-end me-3">
                     <strong>${this.formatPrice(item.price * item.quantity)}</strong>
                 </div>
+
                 <button class="btn btn-sm btn-danger" onclick="window.cartManager.removeFromCart(${item.id})">
                     <i class="fas fa-trash"></i>
                 </button>
@@ -144,7 +161,6 @@ class CartManager {
     }
 
     showModal(title, content) {
-        // Create modal if it doesn't exist
         let modalElement = document.getElementById('cartModal');
 
         if (!modalElement) {
@@ -165,11 +181,9 @@ class CartManager {
             document.body.appendChild(modalElement);
         }
 
-        // Update content
         modalElement.querySelector('.modal-title').innerText = title;
         document.getElementById('cartModalBody').innerHTML = content;
 
-        // Manage Bootstrap Modal Instance
         let bsModal = bootstrap.Modal.getInstance(modalElement);
         if (!bsModal) {
             bsModal = new bootstrap.Modal(modalElement);
@@ -183,13 +197,10 @@ class CartManager {
             alert('Keranjang Anda kosong!');
             return;
         }
-
-        // Redirect to checkout page - Middleware will handle authentication
         window.location.href = '/checkout';
     }
 
     showNotification(message) {
-        // Simple notification
         const notification = document.createElement('div');
         notification.className = 'alert alert-success position-fixed top-0 end-0 m-3';
         notification.style.zIndex = '9999';
@@ -205,4 +216,3 @@ class CartManager {
 }
 
 export default CartManager;
-
