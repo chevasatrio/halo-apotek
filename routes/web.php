@@ -20,4 +20,5 @@ Route::get('/produk/{id}', [HomeController::class, 'detailProduk'])->name('produ
 Route::middleware(['auth'])->group(function () {
     Route::get('/keranjang', [HomeController::class, 'keranjang'])->name('keranjang');
     Route::get('/checkout', [HomeController::class, 'checkout'])->name('checkout');
+    Route::post('/checkout', [App\Http\Controllers\TransactionController::class, 'store'])->name('checkout.process');
 });
