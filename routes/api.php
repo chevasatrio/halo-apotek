@@ -11,7 +11,6 @@ use App\Http\Controllers\Api\UserController;
 
 
 // 1. PUBLIC (Bisa diakses siapa saja)
-
 Route::post('/login', [AuthController::class, 'login']); 
 Route::post('/register', [AuthController::class, 'register']);
 Route::get('/products', [ProductController::class, 'index']);
@@ -31,7 +30,6 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::post('/cart', [CartController::class, 'addToCart']);
         Route::get('/cart', [CartController::class, 'myCart']);
         Route::post('/checkout', [TransactionController::class, 'checkout']);
-        // Note: Pastikan method ini ada di controller
         Route::post('/transaction/{id}/pay', [TransactionController::class, 'uploadPayment']); 
     });
 

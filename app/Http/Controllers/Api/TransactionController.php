@@ -15,8 +15,7 @@ use App\Models\Cart;
 
 // Import Form Request 
 use App\Http\Requests\CheckoutRequest;
-
-use App\Http\Resources\TransactionResource; 
+use App\Http\Resources\TransactionResource;     
 
 class TransactionController extends Controller
 {
@@ -26,68 +25,80 @@ class TransactionController extends Controller
      */
     public function checkout(CheckoutRequest $request)
     {
-        // 1. Ambil data yang sudah lolos validasi (dijamin aman)
-       $validatedData = $request->validated();
-    $items = $validatedData['items'];
+        // 1. Ambil User yang sedang login
+        $user = auth()->user();
+        
+        // 2. Ambil Validasi (Alamat)
+        $validatedData = $request->validated();
+        
+        // 3. AMBIL DARI DATABASE CART (Logic Baru)
+        $cartItems = Cart::with('product')->where('user_id', $user->id)->get();
 
-    try {
-        $result = DB::transaction(function () use ($items) {
+        // Cek apakah keranjang kosong?
+        if ($cartItems->isEmpty()) {
+            return response()->json(['message' => 'Keranjang belanja Anda kosong. Silakan belanja dulu.'], 400);
+        }
+
+        try {
+            $result = DB::transaction(function () use ($cartItems, $user, $validatedData) {
                 
                 $totalAmount = 0;
 
                 // A. Buat Header Transaksi
                 $transaction = Transaction::create([
-                    'user_id' => auth()->id(),
+                    'user_id' => $user->id,
                     'invoice_code' => 'INV-' . time() . rand(100, 999),
-                    'total_amount' => 0, // Update nanti setelah hitung
-                    'status' => 'pending', // unpaid/pending
+                    'total_amount' => 0,
+                    'status' => 'pending',
+                    // Simpan alamat jika kolomnya ada, atau gunakan alamat user
+                    // 'address' => $validatedData['address'], 
                 ]);
 
-                // B. Loop setiap barang belanjaan
-                foreach ($items as $item) {
-                    // Lock for Update mencegah race condition (stok minus saat berebut)
-                    $product = Product::where('id', $item['product_id'])->lockForUpdate()->first();
+                // B. Loop barang dari DATABASE CART
+                foreach ($cartItems as $item) {
+                    // Lock product
+                    $product = Product::where('id', $item->product_id)->lockForUpdate()->first();
 
-                    // Cek stok lagi untuk keamanan ganda
-                    if ($product->stock < $item['quantity']) {
-                        throw new \Exception("Stok {$product->name} tidak cukup.");
+                    // Cek Stok
+                    if (!$product || $product->stock < $item->quantity) {
+                        throw new \Exception("Stok obat {$product->name} tidak cukup.");
                     }
 
-                    // Hitung Subtotal
-                    $subtotal = $product->price * $item['quantity'];
+                    // Hitung
+                    $subtotal = $product->price * $item->quantity;
                     $totalAmount += $subtotal;
 
-                    // C. Masukkan ke Transaction Detail
+                    // Simpan Detail
                     TransactionDetail::create([
                         'transaction_id' => $transaction->id,
                         'product_id' => $product->id,
-                        'quantity' => $item['quantity'],
-                        'price' => $product->price // Simpan harga saat beli (history)
+                        'quantity' => $item->quantity,
+                        'price' => $product->price
                     ]);
 
-                    // D. Kurangi Stok
-                    $product->decrement('stock', $item['quantity']);
+                    // Kurangi Stok
+                    $product->decrement('stock', $item->quantity);
                 }
 
-                // E. Update Total Harga di Header
+                // C. Update Total
                 $transaction->update(['total_amount' => $totalAmount]);
 
-                // F. Hapus keranjang user (jika ada logic cart database)
-                Cart::where('user_id', auth()->id())->delete();
+                // D. HAPUS ISI KERANJANG (PENTING!)
+                // Karena sudah dibeli, keranjang harus kosong kembali
+                Cart::where('user_id', $user->id)->delete();
 
-            // PENTING: Load relasi details agar muncul di Resource
-            $transaction->load(['details.product', 'user']); 
+                // Load relasi untuk output
+                $transaction->load(['details.product', 'user']); 
 
-            return $transaction;
-        });
-            // Return Sukses
-          return response()->json([
-            'message' => 'Checkout berhasil',
-            'data' => new TransactionResource($result) // <--- Bungkus pakai Resource
-        ], 201);
+                return $transaction;
+            });
 
-    } catch (\Exception $e) {
-            // Jika ada error (misal stok habis), batalkan semua query DB
+            return response()->json([
+                'message' => 'Checkout berhasil',
+                'data' => new \App\Http\Resources\TransactionResource($result)
+            ], 201);
+
+        } catch (\Exception $e) {
             return response()->json([
                 'message' => 'Checkout gagal',
                 'error' => $e->getMessage()
