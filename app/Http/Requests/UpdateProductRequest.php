@@ -6,23 +6,23 @@ use Illuminate\Foundation\Http\FormRequest;
 
 class UpdateProductRequest extends FormRequest
 {
-    /**
-     * Determine if the user is authorized to make this request.
-     */
     public function authorize(): bool
     {
-        return false;
+        return true; // Ubah jadi true
     }
 
-    /**
-     * Get the validation rules that apply to the request.
-     *
-     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
-     */
     public function rules(): array
     {
+        // $this->product adalah parameter ID/Model dari route
+        // Contoh URL: /api/products/1 (maka id = 1)
+        
         return [
-            //
+            // ignore($this->product) artinya: Cek unik, tapi abaikan ID produk ini sendiri
+            'name' => ['required', 'string', 'max:255'], 
+            'price' => ['required', 'integer', 'min:100'],
+            'stock' => ['required', 'integer', 'min:0'],
+            'description' => ['nullable', 'string'],
+            'image' => ['nullable', 'image', 'max:2048'], // Image jadi nullable saat update
         ];
     }
 }

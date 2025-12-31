@@ -31,6 +31,8 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::get('/cart', [CartController::class, 'myCart']);
         Route::post('/checkout', [TransactionController::class, 'checkout']);
         Route::post('/transaction/{id}/pay', [TransactionController::class, 'uploadPayment']); 
+        Route::put('/cart/{id}', [CartController::class, 'update']); // Update Qty
+        Route::delete('/cart/{id}', [CartController::class, 'destroy']); // Hapus Item 
     });
 
     // C. Area STAFF (Admin & Kasir)
@@ -41,6 +43,8 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::post('/products', [ProductController::class, 'store']); // Tambah Produk
         Route::put('/products/{id}', [ProductController::class, 'update']);
         Route::post('/transaction/{id}/confirm', [TransactionController::class, 'confirmPayment']);
+        Route::post('/products/{id}', [ProductController::class, 'update']); 
+        Route::delete('/products/{id}', [ProductController::class, 'destroy']);
     });
 
     // D. Area DRIVER (Hanya Role: Driver)
