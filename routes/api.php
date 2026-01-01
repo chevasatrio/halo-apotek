@@ -2,79 +2,76 @@
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
-use Illuminate\Support\Facades\Auth;
+use App\Http\Controllers\AuthController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\CartController;
 use App\Http\Controllers\Api\TransactionController;
-use App\Http\Controllers\AuthController;
 use App\Http\Controllers\Api\UserController;
+use App\Http\Controllers\Api\DashboardController;
 
+/*
+|--------------------------------------------------------------------------
+| API Routes
+|--------------------------------------------------------------------------
+*/
 
-// 1. PUBLIC (Bisa diakses siapa saja)
-Route::post('/login', [AuthController::class, 'login']);
+// ==========================
+// 1. PUBLIC ROUTES (Tanpa Login)
+// ==========================
 Route::post('/register', [AuthController::class, 'register']);
-Route::get('/products', [ProductController::class, 'index']);
+Route::post('/login', [AuthController::class, 'login']);
+Route::get('/products', [ProductController::class, 'index']); // Katalog Produk
 
-// 2. PROTECTED (Harus Login / Punya Token)
+// ==========================
+// 2. PROTECTED ROUTES (Wajib Login)
+// ==========================
 Route::middleware(['auth:sanctum'])->group(function () {
 
-    // A. Area Umum (Semua User Login bisa akses)
+    // --- LOGOUT & USER INFO ---
+    Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/user', function (Request $request) {
         return $request->user();
     });
-    Route::post('/logout', [AuthController::class, 'logout']);
 
-    // B. Area PEMBELI (Hanya Role: Pembeli)
-    // Cart & Checkout & Upload Bukti Bayar
+    // --- ROLE: PEMBELI ---
     Route::middleware(['role:pembeli'])->group(function () {
+        // Keranjang Belanja
         Route::post('/cart', [CartController::class, 'addToCart']);
         Route::get('/cart', [CartController::class, 'myCart']);
-        Route::post('/checkout', [TransactionController::class, 'checkout']);
-        Route::post('/transaction/{id}/pay', [TransactionController::class, 'uploadPayment']);
         Route::put('/cart/{id}', [CartController::class, 'update']); // Update Qty
-        Route::delete('/cart/{id}', [CartController::class, 'destroy']); // Hapus Item 
+        Route::delete('/cart/{id}', [CartController::class, 'destroy']); // Hapus Item
+
+        // Transaksi
+        Route::post('/checkout', [TransactionController::class, 'checkout']);
+        Route::post('/transaction/{id}/pay', [TransactionController::class, 'uploadPayment']); // Upload Bukti Bayar
+        Route::get('/my-orders', [TransactionController::class, 'myHistory']); // Riwayat Belanja
     });
 
-    // C. Area STAFF (Admin & Kasir)
-    // Admin & Kasir bisa kelola produk (misal) dan konfirmasi bayar
+    // --- ROLE: ADMIN & KASIR ---
     Route::middleware(['role:admin,kasir'])->group(function () {
-        Route::get('/users', [UserController::class, 'index']); // Lihat semua user
-        Route::post('/users', [UserController::class, 'store']); // Create Kasir/Driver
-        Route::post('/products', [ProductController::class, 'store']); // Tambah Produk
-        Route::put('/products/{id}', [ProductController::class, 'update']);
-        Route::post('/transaction/{id}/confirm', [TransactionController::class, 'confirmPayment']);
+        // Dashboard & List Transaksi
+        Route::get('/dashboard', [DashboardController::class, 'index']);
+        Route::get('/transactions', [TransactionController::class, 'index']); // Lihat semua order
+
+        // Manajemen User (Admin buat akun staff)
+        Route::get('/users', [UserController::class, 'index']);
+        Route::post('/users', [UserController::class, 'store']);
+
+        // Manajemen Produk
+        Route::post('/products', [ProductController::class, 'store']);
+        // Update Produk (Pakai POST agar bisa upload file/gambar)
         Route::post('/products/{id}', [ProductController::class, 'update']);
         Route::delete('/products/{id}', [ProductController::class, 'destroy']);
+
+        // Proses Transaksi (Lifecycle)
+        Route::post('/transaction/{id}/verify', [TransactionController::class, 'verifyPayment']); // Verifikasi Bukti Bayar
+        Route::post('/transaction/{id}/assign', [TransactionController::class, 'assignDriver']); // Pilih Driver
     });
 
-    // D. Area DRIVER (Hanya Role: Driver)
+    // --- ROLE: DRIVER ---
     Route::middleware(['role:driver'])->group(function () {
-        Route::post('/transaction/{id}/complete', [TransactionController::class, 'completeDelivery']);
-    });
-
-});
-
-// 3. DASHBOARD & REPORTS
-
-Route::middleware(['auth:sanctum'])->group(function () {
-
-    // 1. Dashboard (Hanya Admin & Kasir)
-    Route::middleware(['role:admin,kasir'])->group(function () {
-        Route::get('/dashboard', [\App\Http\Controllers\Api\DashboardController::class, 'index']);
-
-        // Admin lihat semua transaksi
-        Route::get('/transactions', [TransactionController::class, 'index']);
-    });
-
-    // 2. Riwayat Pembeli
-    Route::middleware(['role:pembeli'])->group(function () {
-        // ... cart, checkout ...
-        Route::get('/my-orders', [TransactionController::class, 'myHistory']);
-    });
-
-    // 3. Driver Job List
-    Route::middleware(['role:driver'])->group(function () {
-        Route::get('/driver/jobs', [TransactionController::class, 'index']); // Reuse method index
+        Route::get('/driver/jobs', [TransactionController::class, 'index']); // List tugas pengiriman
+        Route::post('/transaction/{id}/complete', [TransactionController::class, 'completeDelivery']); // Upload bukti sampai
     });
 
 });

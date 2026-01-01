@@ -5,38 +5,30 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
-
-// Models
 use App\Models\Transaction;
 use App\Models\TransactionDetail;
 use App\Models\Product;
 use App\Models\Cart;
-
-// Import Form Request 
+use App\Models\User; // Import Model User
 use App\Http\Requests\CheckoutRequest;
 use App\Http\Resources\TransactionResource;
 
 class TransactionController extends Controller
 {
     /**
-     * FITUR 1: CHECKOUT (PEMBELI)
-     * Menggunakan CheckoutRequest untuk validasi otomatis.
+     * FASE 1: CHECKOUT (PEMBELI)
+     * Status Awal: 'pending'
      */
     public function checkout(CheckoutRequest $request)
     {
-        // 1. Ambil User yang sedang login
         $user = auth()->user();
-
-        // 2. Ambil Validasi (Alamat)
         $validatedData = $request->validated();
 
-        // 3. AMBIL DARI DATABASE CART (Logic Baru)
+        // Ambil barang dari keranjang user
         $cartItems = Cart::with('product')->where('user_id', $user->id)->get();
 
-        // Cek apakah keranjang kosong?
         if ($cartItems->isEmpty()) {
-            return response()->json(['message' => 'Keranjang belanja Anda kosong. Silakan belanja dulu.'], 400);
+            return response()->json(['message' => 'Keranjang belanja kosong.'], 400);
         }
 
         try {
@@ -48,27 +40,23 @@ class TransactionController extends Controller
                 $transaction = Transaction::create([
                     'user_id' => $user->id,
                     'invoice_code' => 'INV-' . time() . rand(100, 999),
-                    'total_amount' => 0,
+                    'total_amount' => 0, // Hitung nanti
                     'status' => 'pending',
-                    // Simpan alamat jika kolomnya ada, atau gunakan alamat user
-                    // 'address' => $validatedData['address'], 
+                    // Gunakan alamat dari input request jika ada
+                    'address' => $validatedData['address'] ?? $user->address ?? 'Alamat tidak diisi',
                 ]);
 
-                // B. Loop barang dari DATABASE CART
+                // B. Loop Cart Items
                 foreach ($cartItems as $item) {
-                    // Lock product
                     $product = Product::where('id', $item->product_id)->lockForUpdate()->first();
 
-                    // Cek Stok
                     if (!$product || $product->stock < $item->quantity) {
-                        throw new \Exception("Stok obat {$product->name} tidak cukup.");
+                        throw new \Exception("Stok {$product->name} tidak cukup.");
                     }
 
-                    // Hitung
                     $subtotal = $product->price * $item->quantity;
                     $totalAmount += $subtotal;
 
-                    // Simpan Detail
                     TransactionDetail::create([
                         'transaction_id' => $transaction->id,
                         'product_id' => $product->id,
@@ -76,26 +64,23 @@ class TransactionController extends Controller
                         'price' => $product->price
                     ]);
 
-                    // Kurangi Stok
                     $product->decrement('stock', $item->quantity);
                 }
 
-                // C. Update Total
                 $transaction->update(['total_amount' => $totalAmount]);
 
-                // D. HAPUS ISI KERANJANG (PENTING!)
-                // Karena sudah dibeli, keranjang harus kosong kembali
+                // C. Kosongkan Keranjang
                 Cart::where('user_id', $user->id)->delete();
 
-                // Load relasi untuk output
+                // D. Load Relasi
                 $transaction->load(['details.product', 'user']);
 
                 return $transaction;
             });
 
             return response()->json([
-                'message' => 'Checkout berhasil',
-                'data' => new \App\Http\Resources\TransactionResource($result)
+                'message' => 'Checkout berhasil. Silakan lakukan pembayaran.',
+                'data' => new TransactionResource($result)
             ], 201);
 
         } catch (\Exception $e) {
@@ -107,78 +92,113 @@ class TransactionController extends Controller
     }
 
     /**
-     * FITUR 2: UPLOAD BUKTI BAYAR (PEMBELI)
+     * FASE 2: UPLOAD BUKTI BAYAR (PEMBELI)
+     * Status Berubah: 'pending' -> 'paid'
      */
     public function uploadPayment(Request $request, $id)
     {
         $request->validate([
-            'image' => 'required|image|max:2048' // Max 2MB
+            'payment_proof' => 'required|image|max:2048' // Gunakan key 'payment_proof' di Postman
         ]);
 
         $transaction = Transaction::where('user_id', auth()->id())->findOrFail($id);
 
-        if ($request->hasFile('image')) {
-            $path = $request->file('image')->store('payments', 'public');
+        if ($transaction->status !== 'pending') {
+            return response()->json(['message' => 'Transaksi bukan status pending.'], 400);
+        }
+
+        if ($request->hasFile('payment_proof')) {
+            $path = $request->file('payment_proof')->store('payment_proofs', 'public');
 
             $transaction->update([
                 'payment_proof' => $path,
-                // Opsional: ubah status jadi waiting_verification
+                'status' => 'paid' // Naik status jadi 'sudah bayar'
             ]);
 
-            return response()->json(['message' => 'Bukti pembayaran berhasil diupload', 'path' => $path]);
+            return response()->json(['message' => 'Bukti bayar terupload. Menunggu verifikasi admin.']);
         }
 
-        return response()->json(['message' => 'File tidak ditemukan'], 400);
+        return response()->json(['message' => 'File gagal diupload'], 400);
     }
 
     /**
-     * FITUR 3: KONFIRMASI PEMBAYARAN (ADMIN/KASIR)
+     * FASE 3: VERIFIKASI PEMBAYARAN (ADMIN/KASIR)
+     * Status Berubah: 'paid' -> 'processing'
      */
-    public function confirmPayment(Request $request, $id)
+    public function verifyPayment($id)
+    {
+        $transaction = Transaction::findOrFail($id);
+
+        // Hanya boleh verifikasi jika status 'paid'
+        if ($transaction->status !== 'paid') {
+            return response()->json(['message' => 'Status transaksi belum dibayar (paid).'], 400);
+        }
+
+        $transaction->update(['status' => 'processing']);
+
+        return response()->json(['message' => 'Pembayaran valid. Status berubah menjadi Processing.']);
+    }
+
+    /**
+     * FASE 4: ASSIGN DRIVER / KIRIM BARANG (ADMIN/KASIR)
+     * Status Berubah: 'processing' -> 'shipping'
+     */
+    public function assignDriver(Request $request, $id)
     {
         $request->validate([
-            'driver_id' => 'required|exists:users,id' // Harus assign ke driver valid
+            'driver_id' => 'required|exists:users,id'
         ]);
 
         $transaction = Transaction::findOrFail($id);
 
+        // Cek apakah user yang dipilih benar-benar driver
+        $driver = User::where('id', $request->driver_id)->where('role', 'driver')->first();
+        if (!$driver) {
+            return response()->json(['message' => 'User ID tersebut bukan Driver.'], 400);
+        }
+
         $transaction->update([
-            'status' => 'shipping', // Ubah status jadi dikirim
-            'driver_id' => $request->driver_id
+            'status' => 'shipping',
+            'driver_id' => $driver->id
         ]);
 
-        return response()->json(['message' => 'Pembayaran dikonfirmasi, Driver ditugaskan']);
+        return response()->json(['message' => 'Driver ditugaskan. Status berubah menjadi Shipping.']);
     }
 
     /**
-     * FITUR 4: SELESAIKAN PESANAN (DRIVER)
+     * FASE 5: SELESAIKAN PESANAN (DRIVER)
+     * Status Berubah: 'shipping' -> 'completed'
      */
     public function completeDelivery(Request $request, $id)
     {
         $request->validate([
-            'image' => 'required|image|max:2048' // Bukti barang sampai
+            'delivery_proof' => 'required|image|max:2048' // Gunakan key 'delivery_proof' di Postman
         ]);
 
-        // Pastikan driver yang login adalah yang ditugaskan (Opsional check)
+        // Pastikan driver yang login adalah yang ditugaskan
         $transaction = Transaction::where('driver_id', auth()->id())->findOrFail($id);
 
-        $path = $request->file('image')->store('evidence', 'public');
+        if ($request->hasFile('delivery_proof')) {
+            $path = $request->file('delivery_proof')->store('delivery_proofs', 'public');
 
-        $transaction->update([
-            'status' => 'completed',
-            'delivery_proof' => $path
-        ]);
+            $transaction->update([
+                'status' => 'completed',
+                'delivery_proof' => $path
+            ]);
 
-        return response()->json(['message' => 'Pesanan selesai diantar']);
+            return response()->json(['message' => 'Pesanan selesai diantar. Status Completed.']);
+        }
+
+        return response()->json(['message' => 'Gagal upload bukti.'], 400);
     }
 
     /**
-     * FITUR 5: RIWAYAT TRANSAKSI (PEMBELI)
+     * LIHAT RIWAYAT SENDIRI (PEMBELI)
      */
     public function myHistory()
     {
         $transactions = Transaction::where('user_id', auth()->id())
-            ->with(['details.product']) // Eager load biar cepat
+            ->with(['details.product'])
             ->orderBy('created_at', 'desc')
             ->get();
 
@@ -186,20 +206,20 @@ class TransactionController extends Controller
             'data' => TransactionResource::collection($transactions)
         ]);
     }
+
     /**
-     * FITUR 6: DAFTAR TRANSAKSI (ADMIN/KASIR/DRIVER)
+     * LIHAT SEMUA TRANSAKSI (ADMIN/KASIR/DRIVER)
      */
     public function index()
     {
-        // Jika Driver, mungkin hanya ingin lihat yang ditugaskan ke dia?
-        // Tapi untuk simplifikasi tugas, kita tampilkan semua dulu atau filter by role.
-
         $query = Transaction::with(['user', 'details.product', 'driver'])->orderBy('created_at', 'desc');
 
-        // Jika driver yang akses, kasih lihat hanya job dia ATAU order yang statusnya 'shipping'
+        // Jika Driver, hanya lihat tugas dia
         if (auth()->user()->role === 'driver') {
-            $query->where('status', 'shipping')
-                ->orWhere('driver_id', auth()->id());
+            $query->where(function ($q) {
+                $q->where('driver_id', auth()->id())
+                    ->orWhere('status', 'shipping'); // Bisa ambil job baru jika sistemnya "grab" (opsional)
+            });
         }
 
         $transactions = $query->get();
@@ -208,6 +228,4 @@ class TransactionController extends Controller
             'data' => TransactionResource::collection($transactions)
         ]);
     }
-
-
 }
