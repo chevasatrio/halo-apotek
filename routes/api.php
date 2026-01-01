@@ -11,7 +11,7 @@ use App\Http\Controllers\Api\UserController;
 
 
 // 1. PUBLIC (Bisa diakses siapa saja)
-Route::post('/login', [AuthController::class, 'login']); 
+Route::post('/login', [AuthController::class, 'login']);
 Route::post('/register', [AuthController::class, 'register']);
 Route::get('/products', [ProductController::class, 'index']);
 
@@ -30,7 +30,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::post('/cart', [CartController::class, 'addToCart']);
         Route::get('/cart', [CartController::class, 'myCart']);
         Route::post('/checkout', [TransactionController::class, 'checkout']);
-        Route::post('/transaction/{id}/pay', [TransactionController::class, 'uploadPayment']); 
+        Route::post('/transaction/{id}/pay', [TransactionController::class, 'uploadPayment']);
         Route::put('/cart/{id}', [CartController::class, 'update']); // Update Qty
         Route::delete('/cart/{id}', [CartController::class, 'destroy']); // Hapus Item 
     });
@@ -43,7 +43,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::post('/products', [ProductController::class, 'store']); // Tambah Produk
         Route::put('/products/{id}', [ProductController::class, 'update']);
         Route::post('/transaction/{id}/confirm', [TransactionController::class, 'confirmPayment']);
-        Route::post('/products/{id}', [ProductController::class, 'update']); 
+        Route::post('/products/{id}', [ProductController::class, 'update']);
         Route::delete('/products/{id}', [ProductController::class, 'destroy']);
     });
 
@@ -51,5 +51,30 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::middleware(['role:driver'])->group(function () {
         Route::post('/transaction/{id}/complete', [TransactionController::class, 'completeDelivery']);
     });
-    
+
+});
+
+// 3. DASHBOARD & REPORTS
+
+Route::middleware(['auth:sanctum'])->group(function () {
+
+    // 1. Dashboard (Hanya Admin & Kasir)
+    Route::middleware(['role:admin,kasir'])->group(function () {
+        Route::get('/dashboard', [\App\Http\Controllers\Api\DashboardController::class, 'index']);
+
+        // Admin lihat semua transaksi
+        Route::get('/transactions', [TransactionController::class, 'index']);
+    });
+
+    // 2. Riwayat Pembeli
+    Route::middleware(['role:pembeli'])->group(function () {
+        // ... cart, checkout ...
+        Route::get('/my-orders', [TransactionController::class, 'myHistory']);
+    });
+
+    // 3. Driver Job List
+    Route::middleware(['role:driver'])->group(function () {
+        Route::get('/driver/jobs', [TransactionController::class, 'index']); // Reuse method index
+    });
+
 });

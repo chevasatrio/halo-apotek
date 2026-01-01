@@ -15,7 +15,7 @@ use App\Models\Cart;
 
 // Import Form Request 
 use App\Http\Requests\CheckoutRequest;
-use App\Http\Resources\TransactionResource;     
+use App\Http\Resources\TransactionResource;
 
 class TransactionController extends Controller
 {
@@ -27,10 +27,10 @@ class TransactionController extends Controller
     {
         // 1. Ambil User yang sedang login
         $user = auth()->user();
-        
+
         // 2. Ambil Validasi (Alamat)
         $validatedData = $request->validated();
-        
+
         // 3. AMBIL DARI DATABASE CART (Logic Baru)
         $cartItems = Cart::with('product')->where('user_id', $user->id)->get();
 
@@ -41,7 +41,7 @@ class TransactionController extends Controller
 
         try {
             $result = DB::transaction(function () use ($cartItems, $user, $validatedData) {
-                
+
                 $totalAmount = 0;
 
                 // A. Buat Header Transaksi
@@ -88,7 +88,7 @@ class TransactionController extends Controller
                 Cart::where('user_id', $user->id)->delete();
 
                 // Load relasi untuk output
-                $transaction->load(['details.product', 'user']); 
+                $transaction->load(['details.product', 'user']);
 
                 return $transaction;
             });
@@ -119,7 +119,7 @@ class TransactionController extends Controller
 
         if ($request->hasFile('image')) {
             $path = $request->file('image')->store('payments', 'public');
-            
+
             $transaction->update([
                 'payment_proof' => $path,
                 // Opsional: ubah status jadi waiting_verification
@@ -171,4 +171,43 @@ class TransactionController extends Controller
 
         return response()->json(['message' => 'Pesanan selesai diantar']);
     }
+
+    /**
+     * FITUR 5: RIWAYAT TRANSAKSI (PEMBELI)
+     */
+    public function myHistory()
+    {
+        $transactions = Transaction::where('user_id', auth()->id())
+            ->with(['details.product']) // Eager load biar cepat
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        return response()->json([
+            'data' => TransactionResource::collection($transactions)
+        ]);
+    }
+    /**
+     * FITUR 6: DAFTAR TRANSAKSI (ADMIN/KASIR/DRIVER)
+     */
+    public function index()
+    {
+        // Jika Driver, mungkin hanya ingin lihat yang ditugaskan ke dia?
+        // Tapi untuk simplifikasi tugas, kita tampilkan semua dulu atau filter by role.
+
+        $query = Transaction::with(['user', 'details.product', 'driver'])->orderBy('created_at', 'desc');
+
+        // Jika driver yang akses, kasih lihat hanya job dia ATAU order yang statusnya 'shipping'
+        if (auth()->user()->role === 'driver') {
+            $query->where('status', 'shipping')
+                ->orWhere('driver_id', auth()->id());
+        }
+
+        $transactions = $query->get();
+
+        return response()->json([
+            'data' => TransactionResource::collection($transactions)
+        ]);
+    }
+
+
 }
