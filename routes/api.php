@@ -15,19 +15,15 @@ use App\Http\Controllers\Api\DashboardController;
 |--------------------------------------------------------------------------
 */
 
-// ==========================
-// 1. PUBLIC ROUTES (Tanpa Login)
-// ==========================
+// 1. PUBLIC ROUTES
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
-Route::get('/products', [ProductController::class, 'index']); // Katalog Produk
+Route::get('/products', [ProductController::class, 'index']);
 
-// ==========================
 // 2. PROTECTED ROUTES (Wajib Login)
-// ==========================
 Route::middleware(['auth:sanctum'])->group(function () {
 
-    // --- LOGOUT & USER INFO ---
+    // --- UMUM ---
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/user', function (Request $request) {
         return $request->user();
@@ -35,46 +31,42 @@ Route::middleware(['auth:sanctum'])->group(function () {
 
     // --- ROLE: PEMBELI ---
     Route::middleware(['role:pembeli'])->group(function () {
-        // Keranjang Belanja
         Route::post('/cart', [CartController::class, 'addToCart']);
         Route::get('/cart', [CartController::class, 'myCart']);
-        Route::put('/cart/{id}', [CartController::class, 'update']); // Update Qty
-        Route::delete('/cart/{id}', [CartController::class, 'destroy']); // Hapus Item
-
-        // Transaksi
-        Route::post('/checkout', [TransactionController::class, 'checkout']);
-        Route::post('/transaction/{id}/pay', [TransactionController::class, 'uploadPayment']); // Upload Bukti Bayar
-        Route::get('/my-orders', [TransactionController::class, 'myHistory']); // Riwayat Belanja
+        Route::put('/cart/{id}', [CartController::class, 'update']);
+        Route::delete('/cart/{id}', [CartController::class, 'destroy']);
+        
+        Route::post('/checkout', [TransactionController::class, 'checkout']); 
+        Route::post('/transaction/{id}/pay', [TransactionController::class, 'uploadPayment']);
+        Route::get('/my-orders', [TransactionController::class, 'myHistory']);
     });
 
     // --- ROLE: ADMIN & KASIR ---
     Route::middleware(['role:admin,kasir'])->group(function () {
-        // Dashboard & List Transaksi
+        // Dashboard
         Route::get('/dashboard', [DashboardController::class, 'index']);
-        Route::get('/transactions', [TransactionController::class, 'index']); // Lihat semua order
+        Route::get('/transactions', [TransactionController::class, 'index']);
 
-        // Manajemen User (Admin buat akun staff)
+        // User Management
         Route::get('/users', [UserController::class, 'index']);
         Route::post('/users', [UserController::class, 'store']);
+        Route::delete('/users/{id}', [UserController::class, 'destroy']);
 
-        // Manajemen Produk
+        // Product Management
         Route::post('/products', [ProductController::class, 'store']);
-        // Update Produk (Pakai POST agar bisa upload file/gambar)
-        Route::post('/products/{id}', [ProductController::class, 'update']);
+        Route::post('/products/{id}', [ProductController::class, 'update']); 
         Route::delete('/products/{id}', [ProductController::class, 'destroy']);
 
-        // Proses Transaksi (Lifecycle)
-        Route::post('/transaction/{id}/verify', [TransactionController::class, 'verifyPayment']); // Verifikasi Bukti Bayar
-        Route::post('/transaction/{id}/assign', [TransactionController::class, 'assignDriver']); // Pilih Driver
-
-        // Delete User
-        Route::delete('/users/{id}', [UserController::class, 'destroy']);
+        // Transaction Process
+        Route::post('/transaction/{id}/verify', [TransactionController::class, 'verifyPayment']); 
+        Route::post('/transaction/{id}/assign', [TransactionController::class, 'assignDriver']); // Opsi A: Pakai Driver
+        Route::post('/transaction/{id}/complete-direct', [TransactionController::class, 'completeDirectly']); // Opsi B: Ambil Sendiri
     });
 
     // --- ROLE: DRIVER ---
     Route::middleware(['role:driver'])->group(function () {
-        Route::get('/driver/jobs', [TransactionController::class, 'index']); // List tugas pengiriman
-        Route::post('/transaction/{id}/complete', [TransactionController::class, 'completeDelivery']); // Upload bukti sampai
+        Route::get('/driver/jobs', [TransactionController::class, 'index']);
+        Route::post('/transaction/{id}/complete', [TransactionController::class, 'completeDelivery']);
     });
 
 });
