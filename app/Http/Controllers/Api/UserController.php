@@ -32,4 +32,27 @@ class UserController extends Controller
     public function index() {
         return response()->json(User::all());
     }
+
+    // Fitur : HAPUS USER (Khusus Admin)
+    public function destroy($id)
+    {
+        // 1. Cari user
+        $user = User::findOrFail($id);
+
+        // 2. Cegah Admin menghapus dirinya sendiri (Bunuh diri)
+        if ($user->id == auth()->id()) {
+            return response()->json([
+                'message' => 'Anda tidak dapat menghapus akun Anda sendiri saat sedang login.'
+            ], 400);
+        }
+
+        // 3. (Opsional) Cegah menghapus user yang punya transaksi aktif
+        // Jika Anda ingin user hilang tapi history transaksi tetap ada, gunakan SoftDeletes di Model.
+        // Tapi untuk sekarang, kita hapus permanen saja.
+        $user->delete();
+
+        return response()->json([
+            'message' => 'User berhasil dihapus permanen.'
+        ]);
+    }
 }
