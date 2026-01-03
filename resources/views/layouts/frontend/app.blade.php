@@ -175,6 +175,7 @@
 </head>
 <body>
     <!-- Navbar -->
+<!-- Navbar -->
     <nav class="navbar navbar-expand-lg navbar-dark">
         <div class="container">
             <a class="navbar-brand" href="{{ route('beranda') }}">
@@ -191,6 +192,32 @@
                     <li class="nav-item">
                         <a class="nav-link" href="#produk">Produk</a>
                     </li>
+
+                    <!-- Cek apakah user sudah login -->
+                    @auth
+                        <!-- Menu untuk pengguna yang sudah login -->
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ route('profile') }}">Profil</a>
+                        </li>
+                        <li class="nav-item">
+                            <!-- Form untuk Logout -->
+                            <form action="{{ route('logout') }}" method="POST" class="d-inline">
+                                @csrf
+                                <button type="submit" class="nav-link btn btn-link">Logout</button>
+                            </form>
+                        </li>
+                    @endauth
+
+                    @guest
+                        <!-- Menu untuk pengguna yang belum login -->
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ route('login') }}">Login</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ route('register') }}">Daftar</a>
+                        </li>
+                    @endguest
+
                     <li class="nav-item ms-3">
                         <div class="location-icon" id="locationBtn">
                             <i class="fas fa-map-marker-alt"></i>
@@ -206,6 +233,7 @@
             </div>
         </div>
     </nav>
+
 
     <!-- Main Content -->
     <main>

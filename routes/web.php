@@ -22,3 +22,5 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/checkout', [HomeController::class, 'checkout'])->name('checkout');
     Route::post('/checkout', [App\Http\Controllers\TransactionController::class, 'store'])->name('checkout.process');
 });
+
+Route::get('profile', [ProfileController::class, 'index'])->middleware('auth')->name('profile');
