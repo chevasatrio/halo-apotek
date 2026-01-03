@@ -66,6 +66,9 @@ Route::middleware(['auth:sanctum'])->group(function () {
         // Proses Transaksi (Lifecycle)
         Route::post('/transaction/{id}/verify', [TransactionController::class, 'verifyPayment']); // Verifikasi Bukti Bayar
         Route::post('/transaction/{id}/assign', [TransactionController::class, 'assignDriver']); // Pilih Driver
+
+        // Delete User
+        Route::delete('/users/{id}', [UserController::class, 'destroy']);
     });
 
     // --- ROLE: DRIVER ---
