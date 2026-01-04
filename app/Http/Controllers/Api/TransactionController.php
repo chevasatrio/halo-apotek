@@ -17,7 +17,6 @@ class TransactionController extends Controller
 {
     /**
      * FASE 1: CHECKOUT (PEMBELI)
-     * Stok berkurang di sini agar tidak overselling.
      */
     public function checkout(CheckoutRequest $request)
     {
@@ -62,7 +61,7 @@ class TransactionController extends Controller
                         'price' => $product->price
                     ]);
 
-                    // --- PENTING: STOK BERKURANG DI SINI ---
+                    // STOK BERKURANG SAAT CHECKOUT (Booking Stock)
                     $product->decrement('stock', $item->quantity);
                 }
 
@@ -136,12 +135,12 @@ class TransactionController extends Controller
 
     /**
      * OPSI A: ASSIGN DRIVER (ADMIN/KASIR)
-     * Jika barang harus dikirim.
      */
     public function assignDriver(Request $request, $id)
     {
+        // 1. Validasi ID User (karena driver ada di tabel users)
         $request->validate([
-            'driver_id' => 'required|exists:users,id'
+            'driver_id' => 'required|exists:users,id' // Cek apakah ID user tersebut ada
         ]);
 
         $transaction = Transaction::findOrFail($id);
@@ -151,14 +150,17 @@ class TransactionController extends Controller
              return response()->json(['message' => 'Transaksi belum siap dikirim (Cek status).'], 400);
         }
 
+        // 2. Cek apakah ID tersebut benar-benar memiliki role 'driver'
         $driver = User::where('id', $request->driver_id)->where('role', 'driver')->first();
+        
         if (!$driver) {
-            return response()->json(['message' => 'User ID tersebut bukan Driver.'], 400);
+            return response()->json(['message' => 'ID User tersebut valid, tetapi bukan role Driver.'], 400);
         }
 
+        // 3. Update Transaksi
         $transaction->update([
             'status' => 'shipping',
-            'driver_id' => $driver->id
+            'driver_id' => $driver->id // Simpan ID User si driver ke kolom driver_id di transaksi
         ]);
 
         return response()->json(['message' => 'Driver ditugaskan. Status: Shipping.']);
@@ -166,7 +168,6 @@ class TransactionController extends Controller
 
     /**
      * OPSI B: SELESAIKAN LANGSUNG (ADMIN/KASIR)
-     * Jika pembeli ambil di toko (Self Pickup).
      */
     public function completeDirectly(Request $request, $id)
     {
@@ -180,8 +181,8 @@ class TransactionController extends Controller
 
         $transaction->update([
             'status' => 'completed',
-            'driver_id' => null, // Tidak butuh driver
-            'delivery_proof' => 'taken_in_store.jpg' // Dummy proof
+            'driver_id' => null, 
+            'delivery_proof' => 'taken_in_store.jpg' 
         ]);
 
         return response()->json(['message' => 'Transaksi selesai (Ambil di tempat).']);
@@ -196,6 +197,7 @@ class TransactionController extends Controller
             'delivery_proof' => 'required|image|max:2048'
         ]);
 
+        // Cek apakah tugas ini milik driver yg login
         $transaction = Transaction::where('driver_id', auth()->id())->findOrFail($id);
 
         if ($request->hasFile('delivery_proof')) {

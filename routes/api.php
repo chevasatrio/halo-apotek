@@ -20,7 +20,7 @@ Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
 Route::get('/products', [ProductController::class, 'index']);
 
-// 2. PROTECTED ROUTES (Wajib Login)
+// 2. PROTECTED ROUTES
 Route::middleware(['auth:sanctum'])->group(function () {
 
     // --- UMUM ---
@@ -51,6 +51,9 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::get('/users', [UserController::class, 'index']);
         Route::post('/users', [UserController::class, 'store']);
         Route::delete('/users/{id}', [UserController::class, 'destroy']);
+        
+        // --- ROUTE BARU: Lihat Daftar Driver ---
+        Route::get('/drivers', [UserController::class, 'getDrivers']); 
 
         // Product Management
         Route::post('/products', [ProductController::class, 'store']);
@@ -59,8 +62,8 @@ Route::middleware(['auth:sanctum'])->group(function () {
 
         // Transaction Process
         Route::post('/transaction/{id}/verify', [TransactionController::class, 'verifyPayment']); 
-        Route::post('/transaction/{id}/assign', [TransactionController::class, 'assignDriver']); // Opsi A: Pakai Driver
-        Route::post('/transaction/{id}/complete-direct', [TransactionController::class, 'completeDirectly']); // Opsi B: Ambil Sendiri
+        Route::post('/transaction/{id}/assign', [TransactionController::class, 'assignDriver']); // Input: driver_id (ID User Driver)
+        Route::post('/transaction/{id}/complete-direct', [TransactionController::class, 'completeDirectly']); 
     });
 
     // --- ROLE: DRIVER ---
