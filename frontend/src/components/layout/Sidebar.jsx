@@ -27,6 +27,15 @@ function Sidebar() {
           Data Obat
         </NavLink>
 
+        <NavLink
+          to="/pegawai"
+          className={({ isActive }) =>
+            "sidebar-link" + (isActive ? " sidebar-link-active" : "")
+          }
+        >
+            Data Pegawai
+        </NavLink>
+
         {/* kalau nanti ada menu lain, tambah di sini */}
       </nav>
     </aside>

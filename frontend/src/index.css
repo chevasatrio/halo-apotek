@@ -1,3 +1,7 @@
+@import "tailwindcss";
+
+
+
 *,
 *::before,
 *::after {
@@ -341,4 +345,32 @@ body {
 .stat-value {
   font-size: 20px;
   font-weight: 700;
+}
+
+.form-group label {
+  color: #e5e7eb;      /* abu-abu terang */
+  font-weight: 600;    /* sedikit tebal biar jelas */
+}
+
+.form-group input:focus,
+.form-group select:focus {
+  outline: none;
+  border-color: #22d3ee;
+  box-shadow: 0 0 0 2px rgba(34, 211, 238, 0.3);
+}
+
+
+
+/* ============ LANDING THEME (public user) ============ */
+
+.landing-wrapper {
+  background: #f9fbff;          /* putih soft */
+  color: #0f172a;
+  min-height: 100vh;
+}
+
+.landing-wrapper h1,
+.landing-wrapper h2,
+.landing-wrapper h3 {
+  color: #0f172a;
 }

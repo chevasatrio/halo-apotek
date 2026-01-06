@@ -30,16 +30,20 @@ function ObatForm() {
   const fetchDetail = async () => {
     if (!isEdit) return;
     setLoadDetail(true);
+    setError("");
+
     try {
-      const res = await api.get(`/obat/${id}`);
+      // GET /api/products/{id}
+      const res = await api.get(`/products/${id}`);
       const data = res.data.data || res.data;
 
       setForm({
-        kode_obat: data.kode_obat || data.kode || "",
-        nama_obat: data.nama_obat || data.nama || "",
+        // kalau nanti di API ada kode / kategori bisa diisi dari sana
+        kode_obat: data.kode_obat || "",
+        nama_obat: data.nama_obat || data.name || "",
         kategori: data.kategori || "",
-        stok: String(data.stok ?? ""),
-        harga: String(data.harga ?? ""),
+        stok: String(data.stok ?? data.stock ?? ""),
+        harga: String(data.harga ?? data.price ?? ""),
       });
     } catch (err) {
       console.error(err);
@@ -59,18 +63,34 @@ function ObatForm() {
     setLoading(true);
 
     try {
-      const payload = {
-        kode_obat: form.kode_obat,
-        nama_obat: form.nama_obat,
-        kategori: form.kategori,
-        stok: Number(form.stok),
-        harga: Number(form.harga),
-      };
+      // pakai FormData karena di Postman juga pakai form-data
+      const fd = new FormData();
+
+      // mapping form -> field API
+      fd.append("name", form.nama_obat);
+      fd.append("price", form.harga);
+      fd.append("stock", form.stok);
+
+      // optional, kalau backendmu memang punya kolom ini
+      fd.append("kode_obat", form.kode_obat);
+      fd.append("kategori", form.kategori);
 
       if (isEdit) {
-        await api.put(`/obat/${id}`, payload);
+        // UPDATE: POST + _method=PUT (sesuai Postman)
+        fd.append("_method", "PUT");
+
+        await api.post(`/products/${id}`, fd, {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        });
       } else {
-        await api.post("/obat", payload);
+        // CREATE: POST /products
+        await api.post("/products", fd, {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        });
       }
 
       navigate("/obat");
@@ -109,7 +129,6 @@ function ObatForm() {
             name="kode_obat"
             value={form.kode_obat}
             onChange={handleChange}
-            required
           />
         </div>
 
