@@ -9,27 +9,44 @@ use Illuminate\Http\Request;
 
 class UserController extends Controller
 {
-    // Fitur: Admin Create Staff (Kasir/Driver/Admin lain)
+    // List Semua User (Admin)
+    public function index() {
+        return response()->json(User::all());
+    }
+
+    // --- TAMBAHAN BARU: List Khusus Driver (Agar Admin tau ID nya) ---
+    public function getDrivers() {
+        // Ambil hanya yang role-nya driver
+        $drivers = User::where('role', 'driver')->get();
+        return response()->json($drivers);
+    }
+
+    // Create User Baru (Admin)
     public function store(StoreUserRequest $request)
     {
         $validated = $request->validated();
-
-        // Pastikan role diisi, kalau kosong default pembeli
         $validated['role'] = $validated['role'] ?? 'pembeli';
-        
-        // Enkripsi Password
         $validated['password'] = bcrypt($validated['password']);
 
         $user = User::create($validated);
 
         return response()->json([
             'message' => 'User baru berhasil ditambahkan',
-            'data' => $user // Anda bisa pakai UserResource di sini jika mau lebih rapi
+            'data' => $user
         ], 201);
     }
-    
-    // Fitur: List Semua User (Opsional, buat Admin lihat staff)
-    public function index() {
-        return response()->json(User::all());
+
+    // Hapus User (Admin)
+    public function destroy($id)
+    {
+        $user = User::findOrFail($id);
+
+        if ($user->id == auth()->id()) {
+            return response()->json(['message' => 'Tidak bisa menghapus akun sendiri.'], 400);
+        }
+
+        $user->delete();
+
+        return response()->json(['message' => 'User berhasil dihapus permanen.']);
     }
 }
