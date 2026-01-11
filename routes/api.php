@@ -52,6 +52,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::post('/users', [UserController::class, 'store']);
         Route::get('/users/{id}', [UserController::class, 'show']); //get user detail
         Route::delete('/users/{id}', [UserController::class, 'destroy']);
+        Route::put('/users/{id}', [UserController::class, 'update']);
         
         // --- ROUTE BARU: Lihat Daftar Driver ---
         Route::get('/drivers', [UserController::class, 'getDrivers']); 
