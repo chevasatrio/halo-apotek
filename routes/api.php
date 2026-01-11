@@ -28,6 +28,10 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::get('/user', function (Request $request) {
         return $request->user();
     });
+    Route::get('/user', [UserController::class, 'me']);
+    Route::put('/user', [UserController::class, 'updateMe']);
+    Route::post('/transactions/{id}/confirm-paid', [TransactionController::class, 'confirmPaid']);
+
 
     // --- ROLE: PEMBELI ---
     Route::middleware(['role:pembeli'])->group(function () {

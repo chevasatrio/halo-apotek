@@ -1,6 +1,6 @@
-// src/pages/PaymentPage.jsx (DUMMY UI ONLY - NO API)
-import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import api from "../services/api";
 
 function formatRupiah(n) {
   const num = Number(n || 0);
@@ -42,11 +42,41 @@ function StepDot({ state }) {
   );
 }
 
-export default function PaymentPage() {
-  // dummy total (nanti dari transaction.total_amount)
-  const total = 27000;
+function statusToStepIndex(status) {
+  const s = String(status || "pending").toLowerCase().trim();
+  const map = {
+    pending: 0,
+    paid: 1,
+    processing: 2,
+    shipping: 3,
+    completed: 4,
+    cancelled: 0,
+  };
+  return map[s] ?? 0;
+}
 
-  // status step: 0=pending, 1=paid, ...
+export default function PaymentPage() {
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  const [error, setError] = useState("");
+  const [verifying, setVerifying] = useState(false);
+
+  const [tx, setTx] = useState(() => {
+    const fromState = location.state?.transaction;
+    if (fromState) return fromState;
+
+    const saved = sessionStorage.getItem("last_transaction");
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  });
+
   const steps = [
     { key: "pending", label: "Checkout", helper: "Transaksi dibuat (pending)" },
     { key: "paid", label: "Pembayaran", helper: "Menunggu verifikasi pembayaran (paid)" },
@@ -55,24 +85,61 @@ export default function PaymentPage() {
     { key: "completed", label: "Selesai", helper: "Pesanan selesai (completed)" },
   ];
 
-  // Default: baru checkout -> pending
-  const [activeStep, setActiveStep] = useState(0);
-  const [verifying, setVerifying] = useState(false);
-  const [paidAt, setPaidAt] = useState(null);
+  const activeStep = useMemo(() => {
+    return statusToStepIndex(tx?.status);
+  }, [tx?.status]);
 
-  const currentStatus = useMemo(() => steps[activeStep]?.key || "pending", [activeStep]);
+  const currentStatus = useMemo(() => {
+    return steps[activeStep]?.key || "pending";
+  }, [activeStep]);
+
+  const total = useMemo(() => {
+    // TransactionResource kamu biasanya punya total_amount
+    return Number(tx?.total_amount ?? tx?.totalAmount ?? 0);
+  }, [tx]);
+
+  useEffect(() => {
+    if (!tx) {
+      // kalau user buka payment tanpa checkout
+      navigate("/pembeli/cart", { replace: true });
+    }
+  }, [tx, navigate]);
 
   async function handleAlreadyPaid() {
+    setError("");
+    if (!tx?.id) {
+      setError("Transaksi tidak valid.");
+      return;
+    }
+
+    // Kalau sudah paid/lebih lanjut, tombol harus terkunci
+    if (activeStep >= 1) return;
+
     setVerifying(true);
     try {
-      // dummy simulate verification click
-      await new Promise((r) => setTimeout(r, 700));
-      setActiveStep(1); // paid
-      setPaidAt(new Date());
+      // Endpoint pembeli: pending -> paid (tanpa upload bukti)
+      // Kamu perlu tambahkan di backend (lihat catatan di bawah).
+      const res = await api.post(`/transactions/${tx.id}/confirm-paid`);
+
+      const updated = res?.data?.data || res?.data || null;
+      if (!updated) {
+        throw new Error("Response API tidak valid.");
+      }
+
+      setTx(updated);
+      sessionStorage.setItem("last_transaction", JSON.stringify(updated));
+    } catch (e) {
+      console.error(e);
+      const msg =
+        e?.response?.data?.message ||
+        "Gagal mengubah status pembayaran. Pastikan endpoint confirm-paid sudah dibuat di backend.";
+      setError(msg);
     } finally {
       setVerifying(false);
     }
   }
+
+  if (!tx) return null;
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -85,7 +152,7 @@ export default function PaymentPage() {
                 Pembayaran
               </h1>
               <p className="mt-1 text-sm text-slate-600">
-                Scan QRIS untuk membayar, lalu klik tombol verifikasi.
+                Lakukan pembayaran, lalu klik “Saya Sudah Bayar”.
               </p>
             </div>
 
@@ -103,6 +170,12 @@ export default function PaymentPage() {
 
       {/* Body */}
       <div className="mx-auto max-w-6xl px-4 py-8">
+        {error ? (
+          <div className="mb-6 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+            {error}
+          </div>
+        ) : null}
+
         <div className="grid gap-6 lg:grid-cols-12">
           {/* LEFT: QRIS + actions */}
           <div className="lg:col-span-8 space-y-6">
@@ -112,7 +185,7 @@ export default function PaymentPage() {
                   <div>
                     <h2 className="text-base font-semibold text-slate-900">QRIS</h2>
                     <p className="mt-1 text-sm text-slate-600">
-                      Scan QR di bawah ini menggunakan aplikasi e-wallet / m-banking.
+                      Scan QR untuk membayar sesuai total tagihan.
                     </p>
                   </div>
                   <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
@@ -122,15 +195,14 @@ export default function PaymentPage() {
               </div>
 
               <div className="px-5 py-6">
-                {/* QR placeholder (rapi, tidak memalukan) */}
                 <div className="grid gap-6 md:grid-cols-2 items-start">
                   <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
                     <div className="aspect-square w-full overflow-hidden rounded-2xl border border-slate-200 bg-white p-4">
                       <div className="h-full w-full rounded-xl bg-[linear-gradient(90deg,rgba(15,23,42,0.08)_0%,rgba(15,23,42,0.08)_25%,transparent_25%,transparent_50%,rgba(15,23,42,0.08)_50%,rgba(15,23,42,0.08)_75%,transparent_75%,transparent_100%)] bg-[length:24px_24px] flex items-center justify-center">
                         <div className="text-center">
-                          <p className="text-sm font-semibold text-slate-800">QRIS (Dummy)</p>
+                          <p className="text-sm font-semibold text-slate-800">QRIS</p>
                           <p className="mt-1 text-xs text-slate-500">
-                            Nanti diganti gambar QR asli dari backend/static.
+                            (Sementara placeholder QR. Nanti bisa diganti gambar QR asli.)
                           </p>
                         </div>
                       </div>
@@ -141,18 +213,9 @@ export default function PaymentPage() {
                       <p className="mt-1 text-xl font-semibold text-slate-900">
                         {formatRupiah(total)}
                       </p>
-                      {paidAt ? (
-                        <p className="mt-2 text-xs text-slate-500">
-                          Terakhir klik “sudah bayar” pada:{" "}
-                          <span className="font-semibold">
-                            {paidAt.toLocaleString("id-ID")}
-                          </span>
-                        </p>
-                      ) : (
-                        <p className="mt-2 text-xs text-slate-500">
-                          Setelah membayar, klik tombol verifikasi di samping.
-                        </p>
-                      )}
+                      <p className="mt-2 text-xs text-slate-500">
+                        Invoice: <span className="font-semibold">{tx?.invoice_code || "-"}</span>
+                      </p>
                     </div>
                   </div>
 
@@ -172,7 +235,7 @@ export default function PaymentPage() {
                       <li className="flex gap-2">
                         <span className="mt-2 h-1.5 w-1.5 rounded-full bg-slate-400" />
                         <span>
-                          Status akan berubah menjadi <span className="font-semibold">paid</span> (dummy).
+                          Status akan berubah menjadi <span className="font-semibold">paid</span>.
                         </span>
                       </li>
                     </ol>
@@ -188,31 +251,29 @@ export default function PaymentPage() {
                         }`}
                     >
                       {verifying
-                        ? "Memverifikasi..."
+                        ? "Memproses..."
                         : activeStep >= 1
                         ? "Sudah Dibayar"
-                        : "Saya Sudah Bayar / Lakukan Verifikasi"}
+                        : "Saya Sudah Bayar"}
                     </button>
 
                     <p className="mt-3 text-xs leading-relaxed text-slate-500">
-                      (Dummy) Nanti tombol ini akan memanggil endpoint upload/konfirmasi pembayaran.
+                      Setelah status paid, proses berikutnya dilakukan oleh admin.
                     </p>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Optional info card */}
             <div className="rounded-2xl border border-slate-200 bg-slate-900 p-5 shadow-sm">
               <p className="text-sm font-semibold text-white">Catatan</p>
               <p className="mt-2 text-sm text-slate-200">
-                Jika pembayaran sudah dilakukan tetapi status belum berubah, pastikan nominal sesuai dan coba ulang
-                verifikasi.
+                Jika status belum berubah, pastikan endpoint konfirmasi pembayaran sudah tersedia di backend.
               </p>
             </div>
           </div>
 
-          {/* RIGHT: Alur Status (interactive) */}
+          {/* RIGHT: Alur Status */}
           <div className="lg:col-span-4">
             <div className="sticky top-6 space-y-6">
               <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -224,7 +285,7 @@ export default function PaymentPage() {
                     </span>
                   </div>
                   <p className="mt-1 text-sm text-slate-600">
-                    Progres akan berhenti di <span className="font-semibold">paid</span> setelah verifikasi.
+                    Progres akan berhenti di <span className="font-semibold">paid</span> setelah kamu klik “Saya Sudah Bayar”.
                   </p>
                 </div>
 
@@ -293,13 +354,11 @@ export default function PaymentPage() {
                 </div>
               </div>
 
-              {/* Tip */}
               <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
                 <div className="px-5 py-5">
                   <p className="text-sm font-semibold text-slate-900">Tips</p>
                   <p className="mt-2 text-sm text-slate-600">
-                    Untuk tahap dummy ini, klik “Saya Sudah Bayar” akan mengunci status ke <span className="font-semibold">paid</span>.
-                    Setelah itu nanti proses berlanjut oleh admin.
+                    Setelah status <span className="font-semibold">paid</span>, admin akan memverifikasi dan melanjutkan proses berikutnya.
                   </p>
                 </div>
               </div>

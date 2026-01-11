@@ -12,11 +12,13 @@ export function AuthProvider({ children }) {
   const [booting, setBooting] = useState(true);
 
   useEffect(() => {
+    let alive = true;
+
     const boot = async () => {
       setBooting(true);
 
-      // kalau tidak ada token, selesai boot tanpa fetch
       if (!token) {
+        if (!alive) return;
         setUser(null);
         setBooting(false);
         return;
@@ -24,29 +26,47 @@ export function AuthProvider({ children }) {
 
       try {
         const res = await api.get("/user");
+        if (!alive) return;
+
         setUser(res.data);
         localStorage.setItem("user", JSON.stringify(res.data));
       } catch (err) {
-        localStorage.removeItem("token");
-        localStorage.removeItem("user");
-        setToken(null);
-        setUser(null);
+        if (!alive) return;
+
+        // HANYA hapus token jika benar-benar 401 (token invalid/expired)
+        const status = err?.response?.status;
+
+        if (status === 401) {
+          localStorage.removeItem("token");
+          localStorage.removeItem("user");
+          setToken(null);
+          setUser(null);
+        } else {
+          // untuk error CORS / network / 500: JANGAN logout paksa
+          // biarkan user dari localStorage tetap dipakai agar tidak flicker & token tidak hilang
+          const raw = localStorage.getItem("user");
+          setUser(raw ? JSON.parse(raw) : null);
+          console.error("Boot /user failed (non-401), keep session:", err);
+        }
       } finally {
-        setBooting(false);
+        if (alive) setBooting(false);
       }
     };
 
     boot();
+    return () => {
+      alive = false;
+    };
   }, [token]);
 
-  const login = ({ token, user }) => {
-    setToken(token);
-    setUser(user);
-    localStorage.setItem("token", token);
-    localStorage.setItem("user", JSON.stringify(user));
+  const login = ({ token: newToken, user: newUser }) => {
+    setToken(newToken);
+    setUser(newUser);
+    localStorage.setItem("token", newToken);
+    localStorage.setItem("user", JSON.stringify(newUser));
 
-    if (user?.role) localStorage.setItem("user_role", user.role.toLowerCase());
-    if (user?.name) localStorage.setItem("user_name", user.name);
+    if (newUser?.role) localStorage.setItem("user_role", String(newUser.role).toLowerCase());
+    if (newUser?.name) localStorage.setItem("user_name", newUser.name);
   };
 
   const logout = async () => {
@@ -70,5 +90,3 @@ export function AuthProvider({ children }) {
 export function useAuth() {
   return useContext(AuthContext);
 }
-
-

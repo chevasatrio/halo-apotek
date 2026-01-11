@@ -1,188 +1,43 @@
-// src/pages/CheckoutPage.jsx (DUMMY UI ONLY - NO API)
-import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import api from "../services/api";
 
 function formatRupiah(n) {
-    const num = Number(n || 0);
-    return "Rp " + num.toLocaleString("id-ID");
+  const num = Number(n || 0);
+  return "Rp " + num.toLocaleString("id-ID");
 }
 
-function StatusPill({ children }) {
-    return (
-        <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
-            {children}
-        </span>
-    );
+function cn(...classes) {
+  return classes.filter(Boolean).join(" ");
 }
 
-function SkeletonLine({ className = "" }) {
-    return (
-        <div className={`animate-pulse rounded bg-slate-200 ${className}`} />
-    );
-}
-
-export default function CheckoutPage() {
-    const navigate = useNavigate();
-
-    const [loading, setLoading] = useState(true);
-    const [submitting, setSubmitting] = useState(false);
-
-    const [cartItems, setCartItems] = useState([]);
-    const [address, setAddress] = useState(
-        "Alamat dummy sementara (belum ambil dari users.address)."
-    );
-    const [note, setNote] = useState(""); // opsional, FE only
-    const [error, setError] = useState("");
-
-    // Fetch Cart
-    useEffect(() => {
-        let mounted = true;
-
-        async function fetchCart() {
-            setLoading(true);
-            setError("");
-
-            try {
-                // Endpoint sesuai route kamu: GET /cart
-                const res = await api.get("/cart");
-
-                // myCart biasanya return { data: [...] }
-                const items = res?.data?.data ?? [];
-                if (mounted) setCartItems(Array.isArray(items) ? items : []);
-            } catch (e) {
-                if (mounted) {
-                    setError(
-                        e?.response?.data?.message || "Gagal memuat keranjang."
-                    );
-                }
-            } finally {
-                if (mounted) setLoading(false);
-            }
-        }
-
-        fetchCart();
-        return () => {
-            mounted = false;
-        };
-    }, []);
-
-    const { itemCount, subtotal } = useMemo(() => {
-        const count = cartItems.reduce(
-            (acc, it) => acc + Number(it.quantity || 0),
-            0
-        );
-        const sum = cartItems.reduce((acc, it) => {
-            const price = Number(it?.product?.price || 0);
-            const qty = Number(it?.quantity || 0);
-            return acc + price * qty;
-        }, 0);
-        return { itemCount: count, subtotal: sum };
-    }, [cartItems]);
-
-    async function handleCheckout() {
-        setSubmitting(true);
-        setError("");
-
-        try {
-            if (!cartItems.length) {
-                setError("Keranjang belanja kosong.");
-                return;
-            }
-
-            // Endpoint sesuai route kamu: POST /checkout
-            const payload = {
-                address: address?.trim() || "Alamat tidak diisi",
-            };
-
-            const res = await api.post("/checkout", payload);
-
-            // Controller return: { message, data: TransactionResource }
-            const trx = res?.data?.data;
-            const trxId = trx?.id;
-
-            // Setelah checkout, cart dihapus server-side -> jangan balik ke cart
-            if (trxId) {
-                navigate(`/buyer/orders/${trxId}/payment`, { replace: true });
-            } else {
-                navigate(`/buyer/orders`, { replace: true });
-            }
-        } catch (e) {
-            setError(
-                e?.response?.data?.message ||
-                    e?.response?.data?.error ||
-                    "Checkout gagal."
-            );
-        } finally {
-            setSubmitting(false);
-        }
-function StepDot({ state }) {
-  // state: "done" | "current" | "todo"
-  const base =
-    "relative flex h-8 w-8 items-center justify-center rounded-full border transition-all duration-300";
-  const styles =
-    state === "done"
-      ? "bg-slate-900 border-slate-900 text-white"
-      : state === "current"
-      ? "bg-white border-slate-900 text-slate-900 shadow-sm"
-      : "bg-white border-slate-200 text-slate-400";
-
-  return (
-    <div className={`${base} ${styles}`}>
-      {state === "done" ? (
-        <svg
-          className="h-4 w-4"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2.2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path d="M20 6L9 17l-5-5" />
-        </svg>
-      ) : (
-        <span className="text-xs font-semibold">•</span>
-      )}
-
-      {state === "current" ? (
-        <span className="absolute -inset-1 rounded-full border border-slate-300 animate-pulse" />
-      ) : null}
-    </div>
-  );
+function normalizeCart(raw) {
+  const items = Array.isArray(raw)
+    ? raw
+    : Array.isArray(raw?.data)
+    ? raw.data
+    : Array.isArray(raw?.items)
+    ? raw.items
+    : [];
+  return items;
 }
 
 export default function CheckoutPage() {
-  // ===== DUMMY MODE FLAGS =====
-  const [loading] = useState(false); // set true kalau mau lihat skeleton
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const selectedIds = useMemo(() => {
+    const ids = location.state?.selected_ids || [];
+    return Array.isArray(ids) ? ids.map((x) => Number(x)) : [];
+  }, [location.state]);
+
+  const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
-  // ===== DUMMY DATA =====
-  const [cartItems] = useState([
-    {
-      id: 5,
-      quantity: 3,
-      product: { id: 1, name: "Paracetamol 500mg", price: 5000 },
-    },
-    {
-      id: 6,
-      quantity: 1,
-      product: { id: 2, name: "Amoxicillin", price: 12000 },
-    },
-  ]);
-
+  const [cartItems, setCartItems] = useState([]);
   const [address, setAddress] = useState("");
-  const [note, setNote] = useState("");
-
-  // ===== DUMMY PROGRESS =====
-  const steps = [
-    { key: "pending", label: "Checkout", helper: "Transaksi dibuat (pending)" },
-    { key: "paid", label: "Upload bukti bayar", helper: "Pembayaran diunggah (paid)" },
-    { key: "processing", label: "Verifikasi", helper: "Admin verifikasi (processing)" },
-    { key: "shipping", label: "Pengiriman", helper: "Driver mengantar (shipping)" },
-    { key: "completed", label: "Selesai", helper: "Pesanan selesai (completed)" },
-  ];
-  const [activeStep, setActiveStep] = useState(0);
+  const [note, setNote] = useState(""); // UI only (tidak dikirim ke DB)
 
   const { itemCount, subtotal } = useMemo(() => {
     const count = cartItems.reduce((acc, it) => acc + Number(it.quantity || 0), 0);
@@ -194,74 +49,100 @@ export default function CheckoutPage() {
     return { itemCount: count, subtotal: sum };
   }, [cartItems]);
 
-  async function handleCheckout() {
+  useEffect(() => {
+    const boot = async () => {
+      setError("");
+      setLoading(true);
+
+      try {
+        // 1) ambil profil user untuk address
+        const meRes = await api.get("/user");
+        const me = meRes?.data || {};
+        setAddress(String(me?.address || "").trim());
+
+        // 2) ambil cart
+        const cartRes = await api.get("/cart");
+        const all = normalizeCart(cartRes.data);
+
+        // filter berdasarkan selectedIds dari CartPage
+        const filtered =
+          selectedIds.length > 0
+            ? all.filter((x) => selectedIds.includes(Number(x.id)))
+            : [];
+
+        setCartItems(filtered);
+      } catch (e) {
+        console.error(e);
+        setError("Gagal memuat data checkout. Silakan coba ulang.");
+        setCartItems([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    boot();
+  }, [selectedIds]);
+
+  const handleCheckout = async () => {
     setError("");
+
+    if (!cartItems.length) {
+      setError("Tidak ada item yang dipilih untuk checkout.");
+      return;
+    }
+
+    const addr = String(address || "").trim();
+    if (!addr) {
+      setError("Alamat pengiriman wajib diisi.");
+      return;
+    }
+
     setSubmitting(true);
     try {
-      await new Promise((r) => setTimeout(r, 600));
-      alert(
-        `DUMMY CHECKOUT\n\nAlamat:\n${address || "-"}\n\nCatatan:\n${note || "-"}\n\nTotal: ${formatRupiah(
-          subtotal
-        )}`
-      );
+      // Backend kamu checkout memakai CheckoutRequest — biasanya butuh address.
+      // selected_ids tetap dikirim (aman), walaupun backend saat ini mungkin abaikan.
+      const res = await api.post("/checkout", {
+        address: addr,
+        selected_ids: selectedIds,
+      });
+
+      // Normalisasi response { message, data: TransactionResource }
+      const tx = res?.data?.data || res?.data;
+
+      // Simpan agar PaymentPage tetap ada datanya walau refresh
+      sessionStorage.setItem("last_transaction", JSON.stringify(tx));
+
+      navigate("/pembeli/payment", { state: { transaction: tx } });
     } catch (e) {
-      setError("Checkout dummy gagal.");
+      console.error(e);
+
+      const msg =
+        e?.response?.data?.message ||
+        (e?.response?.status === 422
+          ? "Checkout gagal: alamat belum sesuai validasi server."
+          : "Checkout gagal. Silakan coba ulang.");
+
+      setError(msg);
     } finally {
       setSubmitting(false);
     }
+  };
 
-    return (
-        <div className="min-h-screen bg-slate-50">
-            {/* Header */}
-            <div className="border-b bg-white">
-                <div className="mx-auto max-w-6xl px-4 py-6">
-                    <div className="flex items-start justify-between gap-4">
-                        <div>
-                            <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
-                                Checkout
-                            </h1>
-                            <p className="mt-1 text-sm text-slate-600">
-                                Konfirmasi alamat dan item pesanan sebelum
-                                membuat transaksi.
-                            </p>
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                            <Link
-                                to="/buyer/cart"
-                                className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
-                            >
-                                Kembali
-                            </Link>
-                        </div>
-                    </div>
-                </div>
+  return (
+    <div className="min-h-screen bg-slate-50">
+      {/* Header */}
+      <div className="border-b bg-white">
+        <div className="mx-auto max-w-6xl px-4 py-6">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
+                Checkout
+              </h1>
+              <p className="mt-1 text-sm text-slate-600">
+                Konfirmasi alamat dan item pesanan sebelum membuat transaksi.
+              </p>
             </div>
 
-            {/* Body */}
-            <div className="mx-auto max-w-6xl px-4 py-8">
-                {error ? (
-                    <div className="mb-6 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-                        {error}
-                    </div>
-                ) : null}
-
-                <div className="grid gap-6 lg:grid-cols-12">
-                    {/* LEFT */}
-                    <div className="lg:col-span-8 space-y-6">
-                        {/* Address */}
-                        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
-                            <div className="border-b border-slate-100 px-5 py-4">
-                                <h2 className="text-base font-semibold text-slate-900">
-                                    Alamat Pengiriman
-                                </h2>
-                                <p className="mt-1 text-sm text-slate-600">
-                                    Sementara isi dummy dulu. Nanti kita
-                                    sambungkan ke{" "}
-                                    <span className="font-semibold">
-                                        users.address
-                                    </span>
-                                    .
             <div className="flex items-center gap-2">
               <Link
                 to="/pembeli/cart"
@@ -285,18 +166,22 @@ export default function CheckoutPage() {
         <div className="grid gap-6 lg:grid-cols-12">
           {/* LEFT */}
           <div className="lg:col-span-8 space-y-6">
-            {/* Address (ONLY address, no note/status) */}
+            {/* Address */}
             <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
               <div className="border-b border-slate-100 px-5 py-4">
-                <h2 className="text-base font-semibold text-slate-900">Alamat Pengiriman</h2>
+                <h2 className="text-base font-semibold text-slate-900">
+                  Alamat Pengiriman
+                </h2>
                 <p className="mt-1 text-sm text-slate-600">
-                  Sementara isi manual dulu. Nanti kita sambungkan ke{" "}
-                  <span className="font-semibold">users.address</span>.
+                  Alamat diambil dari profil kamu. Kamu boleh edit di sini untuk checkout
+                  ini.
                 </p>
               </div>
 
               <div className="px-5 py-5">
-                <label className="block text-sm font-semibold text-slate-700">Alamat</label>
+                <label className="block text-sm font-semibold text-slate-700">
+                  Alamat
+                </label>
                 <textarea
                   rows={4}
                   value={address}
@@ -307,28 +192,24 @@ export default function CheckoutPage() {
               </div>
             </div>
 
-            {/* Items + NOTE moved here */}
+            {/* Items + Note */}
             <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
               <div className="border-b border-slate-100 px-5 py-4">
-                <h2 className="text-base font-semibold text-slate-900">Item Pesanan</h2>
+                <h2 className="text-base font-semibold text-slate-900">
+                  Item Pesanan
+                </h2>
                 <p className="mt-1 text-sm text-slate-600">
-                  (Dummy) Ringkasan item ditampilkan dari data statis.
+                  Item diambil dari keranjang sesuai pilihan kamu.
                 </p>
               </div>
 
               <div className="px-5 py-4">
-                {/* Note moved here */}
+                {/* Catatan (UI only) */}
                 <div className="mb-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold text-slate-900">Catatan</p>
-                      <p className="mt-1 text-sm text-slate-600">
-                        Opsional. Nanti bisa kita ikutkan ke backend jika diperlukan.
-                      </p>
-                    </div>
-                    <span className="text-xs font-semibold text-slate-500">Optional</span>
-                  </div>
-
+                  <p className="text-sm font-semibold text-slate-800">Catatan</p>
+                  <p className="mt-1 text-sm text-slate-600">
+                    Catatan ini hanya untuk tampilan dan tidak disimpan ke database.
+                  </p>
                   <input
                     value={note}
                     onChange={(e) => setNote(e.target.value)}
@@ -338,17 +219,8 @@ export default function CheckoutPage() {
                 </div>
 
                 {loading ? (
-                  <div className="space-y-4">
-                    {[1, 2].map((i) => (
-                      <div key={i} className="flex items-center gap-4">
-                        <SkeletonLine className="h-10 w-10" />
-                        <div className="flex-1 space-y-2">
-                          <SkeletonLine className="h-4 w-2/3" />
-                          <SkeletonLine className="h-4 w-1/3" />
-                        </div>
-                        <SkeletonLine className="h-6 w-24" />
-                      </div>
-                    ))}
+                  <div className="animate-pulse rounded-xl bg-slate-100 p-4 text-sm text-slate-600">
+                    Memuat item checkout...
                   </div>
                 ) : cartItems.length ? (
                   <ul className="divide-y divide-slate-100">
@@ -376,62 +248,23 @@ export default function CheckoutPage() {
                               </div>
 
                               <div>
-                                <p className="text-sm font-semibold text-slate-900">{name}</p>
+                                <p className="text-sm font-semibold text-slate-900">
+                                  {name}
+                                </p>
                                 <p className="mt-1 text-sm text-slate-600">
                                   {formatRupiah(price)}{" "}
-                                  <span className="text-slate-400">×</span> {qty}
+                                  <span className="text-slate-400">×</span>{" "}
+                                  {qty}
                                 </p>
+                              </div>
                             </div>
 
-                            <div className="px-5 py-5">
-                                <label className="block text-sm font-semibold text-slate-700">
-                                    Alamat
-                                </label>
-                                <textarea
-                                    rows={4}
-                                    value={address}
-                                    onChange={(e) => setAddress(e.target.value)}
-                                    placeholder="Masukkan alamat lengkap..."
-                                    className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none focus:border-slate-300 focus:ring-2 focus:ring-slate-200"
-                                />
-
-                                <div className="mt-4 grid gap-4 md:grid-cols-2">
-                                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                                        <p className="text-sm font-semibold text-slate-800">
-                                            Catatan
-                                        </p>
-                                        <p className="mt-1 text-sm text-slate-600">
-                                            Field ini belum dipakai backend.
-                                            Aman sebagai placeholder UI.
-                                        </p>
-                                        <input
-                                            value={note}
-                                            onChange={(e) =>
-                                                setNote(e.target.value)
-                                            }
-                                            className="mt-3 w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 shadow-sm outline-none focus:border-slate-300 focus:ring-2 focus:ring-slate-200"
-                                            placeholder="Contoh: hubungi sebelum sampai"
-                                        />
-                                    </div>
-
-                                    <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                                        <p className="text-sm font-semibold text-slate-900">
-                                            Status Awal
-                                        </p>
-                                        <p className="mt-2 text-sm text-slate-600">
-                                            Setelah checkout, transaksi dibuat
-                                            dengan status:{" "}
-                                            <StatusPill>pending</StatusPill>
-                                        </p>
-                                        <p className="mt-2 text-sm text-slate-600">
-                                            Lanjutkan upload bukti bayar agar
-                                            status menjadi{" "}
-                                            <StatusPill>paid</StatusPill>.
-                                        </p>
-                                    </div>
-                                </div>
+                            <div className="text-right">
+                              <p className="text-sm font-semibold text-slate-900">
+                                {formatRupiah(lineTotal)}
+                              </p>
+                              <p className="mt-1 text-xs text-slate-500">Subtotal</p>
                             </div>
-                        </div>
                           </div>
                         </li>
                       );
@@ -439,15 +272,17 @@ export default function CheckoutPage() {
                   </ul>
                 ) : (
                   <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center">
-                    <p className="text-sm font-semibold text-slate-800">Keranjang kosong</p>
+                    <p className="text-sm font-semibold text-slate-800">
+                      Tidak ada item yang dipilih
+                    </p>
                     <p className="mt-1 text-sm text-slate-600">
-                      Tambahkan produk dulu, lalu checkout.
+                      Kembali ke keranjang dan pilih item yang ingin di-checkout.
                     </p>
                     <Link
-                      to="/pembeli/obat"
+                      to="/pembeli/cart"
                       className="mt-4 inline-flex rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-slate-800"
                     >
-                      Lihat Produk
+                      Kembali ke Keranjang
                     </Link>
                   </div>
                 )}
@@ -461,391 +296,77 @@ export default function CheckoutPage() {
               {/* Summary */}
               <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
                 <div className="border-b border-slate-100 px-5 py-4">
-                  <h2 className="text-base font-semibold text-slate-900">Ringkasan</h2>
+                  <h2 className="text-base font-semibold text-slate-900">
+                    Ringkasan
+                  </h2>
                 </div>
 
                 <div className="px-5 py-5">
                   <div className="space-y-3">
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-slate-600">Item</span>
-                      <span className="font-semibold text-slate-900">{itemCount}</span>
+                      <span className="font-semibold text-slate-900">
+                        {itemCount}
+                      </span>
                     </div>
 
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-slate-600">Subtotal</span>
-                      <span className="font-semibold text-slate-900">{formatRupiah(subtotal)}</span>
+                      <span className="font-semibold text-slate-900">
+                        {formatRupiah(subtotal)}
+                      </span>
                     </div>
 
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-slate-600">Ongkir</span>
-                      <span className="font-semibold text-slate-900">{formatRupiah(0)}</span>
+                      <span className="font-semibold text-slate-900">
+                        {formatRupiah(0)}
+                      </span>
                     </div>
 
-                        {/* Items */}
-                        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
-                            <div className="border-b border-slate-100 px-5 py-4">
-                                <h2 className="text-base font-semibold text-slate-900">
-                                    Item Pesanan
-                                </h2>
-                                <p className="mt-1 text-sm text-slate-600">
-                                    Ringkasan item diambil dari keranjang
-                                    (server-side).
-                                </p>
-                            </div>
+                    <div className="my-4 h-px bg-slate-100" />
 
-                            <div className="px-5 py-4">
-                                {loading ? (
-                                    <div className="space-y-4">
-                                        {[1, 2].map((i) => (
-                                            <div
-                                                key={i}
-                                                className="flex items-center gap-4"
-                                            >
-                                                <SkeletonLine className="h-10 w-10" />
-                                                <div className="flex-1 space-y-2">
-                                                    <SkeletonLine className="h-4 w-2/3" />
-                                                    <SkeletonLine className="h-4 w-1/3" />
-                                                </div>
-                                                <SkeletonLine className="h-6 w-24" />
-                                            </div>
-                                        ))}
-                                    </div>
-                                ) : cartItems.length ? (
-                                    <ul className="divide-y divide-slate-100">
-                                        {cartItems.map((it) => {
-                                            const name =
-                                                it?.product?.name || "Produk";
-                                            const price = Number(
-                                                it?.product?.price || 0
-                                            );
-                                            const qty = Number(
-                                                it?.quantity || 0
-                                            );
-                                            const lineTotal = price * qty;
-
-                                            return (
-                                                <li
-                                                    key={it.id}
-                                                    className="py-4"
-                                                >
-                                                    <div className="flex items-start justify-between gap-4">
-                                                        <div className="flex items-start gap-4">
-                                                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-600">
-                                                                <svg
-                                                                    viewBox="0 0 24 24"
-                                                                    className="h-5 w-5"
-                                                                    fill="none"
-                                                                    stroke="currentColor"
-                                                                    strokeWidth="1.8"
-                                                                >
-                                                                    <path d="M10.5 6.5l7 7a4 4 0 01-5.657 5.657l-7-7A4 4 0 0110.5 6.5z" />
-                                                                    <path d="M14 8l2 2" />
-                                                                </svg>
-                                                            </div>
-
-                                                            <div>
-                                                                <p className="text-sm font-semibold text-slate-900">
-                                                                    {name}
-                                                                </p>
-                                                                <p className="mt-1 text-sm text-slate-600">
-                                                                    {formatRupiah(
-                                                                        price
-                                                                    )}{" "}
-                                                                    <span className="text-slate-400">
-                                                                        ×
-                                                                    </span>{" "}
-                                                                    {qty}
-                                                                </p>
-                                                            </div>
-                                                        </div>
-
-                                                        <div className="text-right">
-                                                            <p className="text-sm font-semibold text-slate-900">
-                                                                {formatRupiah(
-                                                                    lineTotal
-                                                                )}
-                                                            </p>
-                                                            <p className="mt-1 text-xs text-slate-500">
-                                                                Subtotal
-                                                            </p>
-                                                        </div>
-                                                    </div>
-                                                </li>
-                                            );
-                                        })}
-                                    </ul>
-                                ) : (
-                                    <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center">
-                                        <p className="text-sm font-semibold text-slate-800">
-                                            Keranjang kosong
-                                        </p>
-                                        <p className="mt-1 text-sm text-slate-600">
-                                            Tambahkan produk dulu, lalu
-                                            checkout.
-                                        </p>
-                                        <Link
-                                            to="/buyer/obat"
-                                            className="mt-4 inline-flex rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-slate-800"
-                                        >
-                                            Lihat Produk
-                                        </Link>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-semibold text-slate-900">
+                        Total
+                      </span>
+                      <span className="text-lg font-semibold tracking-tight text-slate-900">
+                        {formatRupiah(subtotal)}
+                      </span>
                     </div>
+                  </div>
 
-                    {/* RIGHT */}
-                    <div className="lg:col-span-4">
-                        <div className="sticky top-6 space-y-6">
-                            {/* Summary */}
-                            <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
-                                <div className="border-b border-slate-100 px-5 py-4">
-                                    <h2 className="text-base font-semibold text-slate-900">
-                                        Ringkasan
-                                    </h2>
-                                </div>
-
-                                <div className="px-5 py-5">
-                                    <div className="space-y-3">
-                                        <div className="flex items-center justify-between text-sm">
-                                            <span className="text-slate-600">
-                                                Item
-                                            </span>
-                                            <span className="font-semibold text-slate-900">
-                                                {itemCount}
-                                            </span>
-                                        </div>
-
-                                        <div className="flex items-center justify-between text-sm">
-                                            <span className="text-slate-600">
-                                                Subtotal
-                                            </span>
-                                            <span className="font-semibold text-slate-900">
-                                                {formatRupiah(subtotal)}
-                                            </span>
-                                        </div>
-
-                                        <div className="flex items-center justify-between text-sm">
-                                            <span className="text-slate-600">
-                                                Ongkir
-                                            </span>
-                                            <span className="font-semibold text-slate-900">
-                                                {formatRupiah(0)}
-                                            </span>
-                                        </div>
-
-                                        <div className="my-4 h-px bg-slate-100" />
-
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-sm font-semibold text-slate-900">
-                                                Total
-                                            </span>
-                                            <span className="text-lg font-semibold tracking-tight text-slate-900">
-                                                {formatRupiah(subtotal)}
-                                            </span>
-                                        </div>
-                                    </div>
-
-                                    <button
-                                        onClick={handleCheckout}
-                                        disabled={
-                                            loading ||
-                                            submitting ||
-                                            !cartItems.length
-                                        }
-                                        className={`mt-5 w-full rounded-xl px-4 py-3 text-sm font-semibold shadow-sm transition
-                      ${
-                          loading || submitting || !cartItems.length
-                              ? "bg-slate-200 text-slate-500 cursor-not-allowed"
-                              : "bg-slate-900 text-white hover:bg-slate-800"
                   <button
                     onClick={handleCheckout}
-                    disabled={submitting || !cartItems.length}
-                    className={`mt-5 w-full rounded-xl px-4 py-3 text-sm font-semibold shadow-sm transition
-                      ${
-                        submitting || !cartItems.length
-                          ? "bg-slate-200 text-slate-500 cursor-not-allowed"
-                          : "bg-slate-900 text-white hover:bg-slate-800"
-                      }`}
-                                    >
-                                        {submitting
-                                            ? "Membuat Pesanan..."
-                                            : "Checkout Sekarang"}
-                                    </button>
+                    disabled={submitting || loading || !cartItems.length}
+                    className={cn(
+                      "mt-5 w-full rounded-xl px-4 py-3 text-sm font-semibold shadow-sm transition",
+                      submitting || loading || !cartItems.length
+                        ? "bg-slate-200 text-slate-500 cursor-not-allowed"
+                        : "bg-slate-900 text-white hover:bg-slate-800"
+                    )}
+                  >
+                    {submitting ? "Membuat Pesanan..." : "Checkout Sekarang"}
+                  </button>
 
-                                    <p className="mt-3 text-xs leading-relaxed text-slate-500">
-                                        Sistem akan membuat invoice dan
-                                        mengosongkan keranjang. Setelah itu,
-                                        upload bukti pembayaran.
-                                    </p>
-                                </div>
-                            </div>
-
-                            {/* Flow card */}
-                            <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
-                                <div className="px-5 py-5">
-                                    <p className="text-sm font-semibold text-slate-900">
-                                        Alur Status
-                                    </p>
-                                    <ol className="mt-3 space-y-2 text-sm text-slate-600">
-                                        <li className="flex items-center justify-between">
-                                            <span>Checkout</span>
-                                            <StatusPill>pending</StatusPill>
-                                        </li>
-                                        <li className="flex items-center justify-between">
-                                            <span>Upload bukti bayar</span>
-                                            <StatusPill>paid</StatusPill>
-                                        </li>
-                                        <li className="flex items-center justify-between">
-                                            <span>Verifikasi</span>
-                                            <StatusPill>processing</StatusPill>
-                                        </li>
-                                        <li className="flex items-center justify-between">
-                                            <span>Pengiriman</span>
-                                            <StatusPill>shipping</StatusPill>
-                                        </li>
-                                        <li className="flex items-center justify-between">
-                                            <span>Selesai</span>
-                                            <StatusPill>completed</StatusPill>
-                                        </li>
-                                    </ol>
-                                </div>
-                            </div>
-
-                            {/* Help */}
-                            <div className="rounded-2xl border border-slate-200 bg-slate-900 p-5 shadow-sm">
-                                <p className="text-sm font-semibold text-white">
-                                    Tips
-                                </p>
-                                <p className="mt-2 text-sm text-slate-200">
-                                    Jika stok tidak cukup, backend akan menolak
-                                    checkout dan menampilkan error.
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
                   <p className="mt-3 text-xs leading-relaxed text-slate-500">
-                    (Dummy) Ini hanya preview UI. Nanti baru kita sambungkan ke API.
+                    Setelah pesanan dibuat, kamu akan diarahkan ke halaman pembayaran.
                   </p>
                 </div>
               </div>
 
-              {/* Progress (Vertical interactive) */}
-              <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
-                <div className="border-b border-slate-100 px-5 py-4">
-                  <div className="flex items-center justify-between">
-                    <h2 className="text-base font-semibold text-slate-900">Alur Status</h2>
-                    <span className="text-xs font-semibold text-slate-500">
-                      Step {activeStep + 1}/{steps.length}
-                    </span>
-                  </div>
-                  <p className="mt-1 text-sm text-slate-600">
-                    (Dummy) Klik step untuk melihat simulasi progres.
-                  </p>
-                </div>
-
-                <div className="px-5 py-5">
-                  <ol className="relative">
-                    {/* vertical line */}
-                    <div className="absolute left-4 top-2 bottom-2 w-px bg-slate-200" />
-
-                    <div className="space-y-4">
-                      {steps.map((s, idx) => {
-                        const state =
-                          idx < activeStep ? "done" : idx === activeStep ? "current" : "todo";
-
-                        return (
-                          <li key={s.key} className="relative flex items-start gap-4">
-                            <button
-                              type="button"
-                              onClick={() => setActiveStep(idx)}
-                              className="group relative z-10"
-                              aria-label={`Set step ${idx + 1}`}
-                            >
-                              <StepDot state={state} />
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => setActiveStep(idx)}
-                              className={`flex-1 rounded-xl border px-4 py-3 text-left transition-all duration-300
-                                ${
-                                  idx === activeStep
-                                    ? "border-slate-300 bg-slate-50 shadow-sm"
-                                    : "border-slate-200 bg-white hover:bg-slate-50"
-                                }`}
-                            >
-                              <div className="flex items-start justify-between gap-3">
-                                <div>
-                                  <p
-                                    className={`text-sm font-semibold ${
-                                      idx === activeStep ? "text-slate-900" : "text-slate-800"
-                                    }`}
-                                  >
-                                    {idx + 1}. {s.label}
-                                  </p>
-                                  <p className="mt-1 text-sm text-slate-600">{s.helper}</p>
-                                </div>
-
-                                <span
-                                  className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold transition
-                                    ${
-                                      idx === activeStep
-                                        ? "bg-slate-900 text-white"
-                                        : idx < activeStep
-                                        ? "bg-slate-100 text-slate-700"
-                                        : "bg-slate-50 text-slate-500"
-                                    }`}
-                                >
-                                  {s.key}
-                                </span>
-                              </div>
-
-                              {idx === activeStep ? (
-                                <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-slate-200">
-                                  <div className="h-full w-full origin-left animate-[progress_900ms_ease-out] bg-slate-900" />
-                                </div>
-                              ) : null}
-                            </button>
-                          </li>
-                        );
-                      })}
-                    </div>
-                  </ol>
-
-                  {/* Tailwind keyframes via arbitrary animation needs @keyframes in CSS.
-                      Kita bikin fallback: gunakan inline style di bawah.
-                  */}
-                  <style>{`
-                    @keyframes progress {
-                      0% { transform: scaleX(0); }
-                      100% { transform: scaleX(1); }
-                    }
-                  `}</style>
-                </div>
-              </div>
-
-              {/* Tips (tetap oke, tapi dibuat lebih “useful”) */}
+              {/* Info */}
               <div className="rounded-2xl border border-slate-200 bg-slate-900 p-5 shadow-sm">
-                <p className="text-sm font-semibold text-white">Info Penting</p>
-                <ul className="mt-3 space-y-2 text-sm text-slate-200">
-                  <li className="flex gap-2">
-                    <span className="mt-1 h-1.5 w-1.5 rounded-full bg-slate-200" />
-                    <span>Pastikan alamat lengkap agar pengiriman tidak tertunda.</span>
-                  </li>
-                  <li className="flex gap-2">
-                    <span className="mt-1 h-1.5 w-1.5 rounded-full bg-slate-200" />
-                    <span>Periksa ulang item dan jumlah sebelum checkout.</span>
-                  </li>
-                  <li className="flex gap-2">
-                    <span className="mt-1 h-1.5 w-1.5 rounded-full bg-slate-200" />
-                    <span>Jika stok tidak cukup, backend akan menolak checkout (nanti saat API aktif).</span>
-                  </li>
-                </ul>
+                <p className="text-sm font-semibold text-white">Catatan Sistem</p>
+                <p className="mt-2 text-sm text-slate-200">
+                  Checkout akan melakukan validasi stok di server. Jika stok tidak cukup,
+                  transaksi akan ditolak.
+                </p>
               </div>
             </div>
-        </div>
-    );
+          </div>
+        </div>{/* end grid */}
+      </div>
+    </div>
+  );
 }

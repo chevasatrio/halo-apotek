@@ -1,45 +1,39 @@
 import { NavLink } from "react-router-dom";
+import { useAuth } from "../../Context/AuthContext"; // sesuaikan path bila perlu
+
+const MENU_BY_ROLE = {
+  admin: [
+    { label: "Dashboard", to: "/dashboard" },
+    { label: "Data Obat", to: "/dashboard/obat" },
+    { label: "Transaksi", to: "/dashboard/transaksi" },
+    { label: "Driver", to: "/dashboard/driver" },
+    { label: "Data Pegawai", to: "/dashboard/pegawai" },
+  ],
+  kasir: [{ label: "Transaksi", to: "/dashboard/transaksi" }],
+  driver: [{ label: "Driver", to: "/dashboard/driver" }],
+};
 
 function Sidebar() {
+  const { user } = useAuth();
+  const role = String(user?.role || "").toLowerCase().trim();
+  const menus = MENU_BY_ROLE[role] || [];
+
   const linkClass = ({ isActive }) =>
     "sidebar-link" + (isActive ? " sidebar-link-active" : "");
 
   return (
     <aside className="sidebar">
-      {/* LOGO */}
       <div className="sidebar-logo">
         <span className="logo-dot" />
         <span>Halo Apotek</span>
       </div>
 
-      {/* NAV */}
       <nav className="sidebar-nav">
-        <NavLink to="/dashboard" className={linkClass}>
-          Dashboard
-        </NavLink>
-
-        <NavLink to="/dashboard/obat" className={linkClass}>
-          Data Obat
-        </NavLink>
-
-        <NavLink to="/dashboard/transaksi" className={linkClass}>
-          Transaksi
-        </NavLink>
-
-        <NavLink to="/dashboard/driver" className={linkClass}>
-          Driver
-        </NavLink>
-
-        <NavLink to="/dashboard/pegawai" className={linkClass}>
-          Data Pegawai
-        </NavLink>
-
-        {/* nanti kalau ada:
-            - Laporan
-            - Setting
-            - dsb
-            tinggal tambah di sini
-        */}
+        {menus.map((m) => (
+          <NavLink key={m.to} to={m.to} className={linkClass} end={m.to === "/dashboard"}>
+            {m.label}
+          </NavLink>
+        ))}
       </nav>
     </aside>
   );
