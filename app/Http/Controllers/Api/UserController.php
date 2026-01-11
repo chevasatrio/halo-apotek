@@ -26,6 +26,8 @@ class UserController extends Controller
     {
         $validated = $request->validated();
         $validated['role'] = $validated['role'] ?? 'pembeli';
+
+        // Enkripsi Password
         $validated['password'] = bcrypt($validated['password']);
 
         $user = User::create($validated);
@@ -34,6 +36,11 @@ class UserController extends Controller
             'message' => 'User baru berhasil ditambahkan',
             'data' => $user
         ], 201);
+    }
+
+    // Fitur: List Semua User (Opsional, buat Admin lihat staff)
+    public function index() {
+        return response()->json(User::all());
     }
 
     // Hapus User (Admin)
@@ -49,4 +56,15 @@ class UserController extends Controller
 
         return response()->json(['message' => 'User berhasil dihapus permanen.']);
     }
+
+    public function show($id)
+{
+    // Cari user, jika tidak ditemukan otomatis 404
+    $user = User::findOrFail($id);
+
+    return response()->json([
+        'message' => 'Detail user ditemukan',
+        'data' => $user
+    ]);
+}
 }

@@ -9,24 +9,36 @@ use Illuminate\Http\Request;
 class CartController extends Controller
 {
     // Tambah ke Keranjang
-    public function addToCart(Request $request) {
-        $request->validate([
-            'product_id' => 'required',
-            'quantity' => 'required|integer|min:1'
+    public function addToCart(Request $request)
+{
+    $request->validate([
+        'product_id' => 'required',
+        'quantity' => 'required|integer|min:1'
+    ]);
+
+    $userId = auth()->id();
+    $productId = $request->product_id;
+    $qty = (int) $request->quantity;
+
+    $cart = Cart::where('user_id', $userId)
+        ->where('product_id', $productId)
+        ->first();
+
+    if ($cart) {
+        // kalau sudah ada, baru ditambah
+        $cart->increment('quantity', $qty);
+        $cart->refresh();
+    } else {
+        // kalau belum ada, set pertama kali = qty (biasanya 1)
+        $cart = Cart::create([
+            'user_id' => $userId,
+            'product_id' => $productId,
+            'quantity' => $qty,
         ]);
-
-        $cart = Cart::updateOrCreate(
-            [
-                'user_id' => auth()->id(), 
-                'product_id' => $request->product_id
-            ],
-            [
-                'quantity' => \DB::raw("quantity + $request->quantity")
-            ]
-        );
-
-        return response()->json(['message' => 'Masuk keranjang', 'data' => $cart]);
     }
+
+    return response()->json(['message' => 'Masuk keranjang', 'data' => $cart]);
+}
 
     // Lihat Keranjang Saya
     public function myCart() {
@@ -44,8 +56,8 @@ class CartController extends Controller
         ]);
 
         // Pastikan update cart punya sendiri, bukan punya orang lain
-        $cart = Cart::where('user_id', auth()->id())->findOrFail($id);
-        
+        $cart = Cart::where('user_id', auth()->id())->with('product')->findOrFail($id);
+
         // Cek stok produk (Opsional tapi bagus)
         if ($cart->product->stock < $request->quantity) {
             return response()->json(['message' => 'Stok tidak mencukupi'], 400);
@@ -63,7 +75,7 @@ class CartController extends Controller
     {
         // Pastikan hapus cart punya sendiri
         $cart = Cart::where('user_id', auth()->id())->findOrFail($id);
-        
+
         $cart->delete();
 
         return response()->json(['message' => 'Item dihapus dari keranjang']);

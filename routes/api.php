@@ -50,6 +50,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
         // User Management
         Route::get('/users', [UserController::class, 'index']);
         Route::post('/users', [UserController::class, 'store']);
+        Route::get('/users/{id}', [UserController::class, 'show']); //get user detail
         Route::delete('/users/{id}', [UserController::class, 'destroy']);
         
         // --- ROUTE BARU: Lihat Daftar Driver ---
@@ -59,6 +60,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::post('/products', [ProductController::class, 'store']);
         Route::post('/products/{id}', [ProductController::class, 'update']); 
         Route::delete('/products/{id}', [ProductController::class, 'destroy']);
+        Route::get('/products/{id}', [ProductController::class, 'show']); //get product detail
 
         // Transaction Process
         Route::post('/transaction/{id}/verify', [TransactionController::class, 'verifyPayment']); 
