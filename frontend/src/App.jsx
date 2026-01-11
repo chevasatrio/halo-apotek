@@ -15,6 +15,9 @@ import LandingBuyer from "./pages/LandingBuyer";
 import BuyerObatPage from "./pages/BuyerObatPage.jsx";
 import CartPage from "./pages/CartPage.jsx";
 import CheckoutPage from "./pages/CheckoutPage.jsx";
+import ListTransaksi from "./pages/ListTransaksi.jsx";
+import TransaksiForm from "./pages/TransaksiForm.jsx";
+import DriverList from "./pages/ListDriver.jsx";
 
 import DashboardLayout from "./components/layout/DashboardLayout.jsx";
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
@@ -62,6 +65,13 @@ function App() {
           <Route path="pegawai" element={<ListPegawai />} />
           <Route path="pegawai/tambah" element={<PegawaiForm />} />
           <Route path="pegawai/:id/edit" element={<PegawaiForm />} />
+
+          <Route path="transaksi" element={<ListTransaksi />} />
+        <Route path="transaksi/:id" element={<TransaksiForm />} />
+        <Route path="transaksi/:id/edit" element={<TransaksiForm />} />
+
+        <Route path="driver" element={<DriverList />} />
+
         </Route>
       </Route>
 

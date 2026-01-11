@@ -19,6 +19,7 @@ export default function DashboardLayout() {
     { label: "Data Obat", to: "/dashboard/obat" },
     { label: "Transaksi", to: "/dashboard/transaksi" },
     { label: "Pengguna", to: "/dashboard/pegawai" },
+    { label: "Driver", to: "/dashboard/driver" },
   ];
 
   const pageTitle =
