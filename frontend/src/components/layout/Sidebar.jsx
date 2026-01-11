@@ -1,42 +1,45 @@
 import { NavLink } from "react-router-dom";
 
 function Sidebar() {
+  const linkClass = ({ isActive }) =>
+    "sidebar-link" + (isActive ? " sidebar-link-active" : "");
+
   return (
     <aside className="sidebar">
+      {/* LOGO */}
       <div className="sidebar-logo">
         <span className="logo-dot" />
         <span>Halo Apotek</span>
       </div>
 
+      {/* NAV */}
       <nav className="sidebar-nav">
-        <NavLink
-          to="/dashboard"
-          className={({ isActive }) =>
-            "sidebar-link" + (isActive ? " sidebar-link-active" : "")
-          }
-        >
+        <NavLink to="/dashboard" className={linkClass}>
           Dashboard
         </NavLink>
 
-        <NavLink
-          to="/obat"
-          className={({ isActive }) =>
-            "sidebar-link" + (isActive ? " sidebar-link-active" : "")
-          }
-        >
+        <NavLink to="/dashboard/obat" className={linkClass}>
           Data Obat
         </NavLink>
 
-        <NavLink
-          to="/pegawai"
-          className={({ isActive }) =>
-            "sidebar-link" + (isActive ? " sidebar-link-active" : "")
-          }
-        >
-            Data Pegawai
+        <NavLink to="/dashboard/transaksi" className={linkClass}>
+          Transaksi
         </NavLink>
 
-        {/* kalau nanti ada menu lain, tambah di sini */}
+        <NavLink to="/dashboard/driver" className={linkClass}>
+          Driver
+        </NavLink>
+
+        <NavLink to="/dashboard/pegawai" className={linkClass}>
+          Data Pegawai
+        </NavLink>
+
+        {/* nanti kalau ada:
+            - Laporan
+            - Setting
+            - dsb
+            tinggal tambah di sini
+        */}
       </nav>
     </aside>
   );
