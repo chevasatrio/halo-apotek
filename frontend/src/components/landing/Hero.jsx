@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import api from "../../services/api";
 
 function IconCart() {
   return (
@@ -37,40 +39,116 @@ function IconChat() {
 }
 
 export default function Hero() {
-  const [search, setSearch] = useState("");
+  const navigate = useNavigate();
 
-  // dummy sementara
-  const cartCount = 2;
+  const [search, setSearch] = useState("");
+  const [cartCount, setCartCount] = useState(0);
+
   const unreadChat = 1;
-  const userName = "Naufal";
+  const userName = localStorage.getItem("user_name") || "User";
+  const role = (localStorage.getItem("user_role") || "").toLowerCase();
+  const token = localStorage.getItem("token");
+
+  // ===== HERO TITLE TYPING =====
+  const fullText = "Obat Resmi, Aman, & Sampai ke Rumah";
+  const [typed, setTyped] = useState("");
+
+  useEffect(() => {
+    let i = 0;
+    const typing = setInterval(() => {
+      setTyped(fullText.slice(0, i++));
+      if (i > fullText.length) clearInterval(typing);
+    }, 40);
+    return () => clearInterval(typing);
+  }, []);
+
+  // ===== SEARCH SUGGESTION TYPING =====
+  const suggestions = ["Paracetamol", "Vitamin C", "Obat maag", "Sirup batuk anak"];
+  const [placeholder, setPlaceholder] = useState("");
+  const [index, setIndex] = useState(0);
+  const [char, setChar] = useState(0);
+
+  useEffect(() => {
+    const typing = setInterval(() => {
+      setPlaceholder(suggestions[index].slice(0, char + 1));
+      setChar((c) => c + 1);
+    }, 60);
+
+    if (char === suggestions[index].length) {
+      clearInterval(typing);
+      setTimeout(() => {
+        setChar(0);
+        setIndex((i) => (i + 1) % suggestions.length);
+        setPlaceholder("");
+      }, 1200);
+    }
+
+    return () => clearInterval(typing);
+  }, [char, index]);
+
+  // ===== LOAD CART COUNT =====
+  useEffect(() => {
+    const loadCart = async () => {
+      if (!token || role !== "pembeli") {
+        setCartCount(0);
+        return;
+      }
+
+      try {
+        const res = await api.get("/cart");
+        const items = Array.isArray(res.data) ? res.data : [];
+        setCartCount(items.length);
+      } catch {
+        setCartCount(0);
+      }
+    };
+
+    loadCart();
+  }, [token, role]);
+
+  // ===== NAV: GO TO OBAT PAGE WITH QUERY =====
+  const goToObat = (useKeyword = true) => {
+  const q = (search || "").trim();
+
+  // kirim lewat state biar tidak hilang walau URL dibersihkan
+  navigate("/pembeli/obat", {
+    state: { q: useKeyword ? q : "" },
+  });
+};
+
+
+  const onSearchSubmit = (e) => {
+    e.preventDefault();
+    goToObat(true);
+  };
 
   return (
     <section className="relative overflow-hidden">
-      {/* background gradient ala Medilo */}
       <div className="absolute inset-0 bg-gradient-to-br from-sky-50 via-white to-sky-100" />
 
       <div className="relative max-w-6xl mx-auto px-6 py-16">
-        {/* ===== TOP BAR (FULL WIDTH) ===== */}
+        {/* ===== TOP BAR ===== */}
         <div className="flex items-center justify-between mb-8">
-          {/* badge kiri */}
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-sky-100 text-sky-700 text-xs font-medium">
-            <span className="w-2 h-2 rounded-full bg-emerald-400" />
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
             Apotek Online & Delivery Cepat
           </div>
 
-          {/* ikon kanan + avatar */}
           <div className="flex items-center gap-2">
             {/* CART */}
-            <button className="relative w-9 h-9 rounded-full bg-white border border-slate-200 flex items-center justify-center shadow-sm hover:bg-sky-50 transition">
+            <Link
+              to="/cart"
+              className="relative w-9 h-9 rounded-full bg-white border border-slate-200 flex items-center justify-center shadow-sm hover:bg-sky-50 transition"
+              aria-label="Cart"
+            >
               <IconCart />
               {cartCount > 0 && (
                 <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] rounded-full bg-rose-500 text-white text-[10px] flex items-center justify-center px-1">
                   {cartCount}
                 </span>
               )}
-            </button>
+            </Link>
 
-            {/* CHAT */}
             <button className="relative w-9 h-9 rounded-full bg-white border border-slate-200 flex items-center justify-center shadow-sm hover:bg-sky-50 transition">
               <IconChat />
               {unreadChat > 0 && (
@@ -80,56 +158,68 @@ export default function Hero() {
               )}
             </button>
 
-            {/* AVATAR + NAMA */}
             <div className="hidden sm:flex items-center gap-2 bg-white/80 border border-slate-200 rounded-full px-3 py-1 shadow-sm">
               <div className="w-7 h-7 rounded-full bg-sky-500 text-white flex items-center justify-center text-[11px] font-semibold">
                 {userName.charAt(0).toUpperCase()}
               </div>
               <span className="text-xs text-slate-700">
-                Halo,&nbsp;
-                <span className="font-semibold">{userName}</span>
+                Halo,&nbsp;<span className="font-semibold">{userName}</span>
               </span>
             </div>
           </div>
         </div>
 
-        {/* ===== HERO CONTENT: GRID 2 KOLOM ===== */}
+        {/* ===== GRID CONTENT ===== */}
         <div className="grid md:grid-cols-2 gap-10 items-center">
-          {/* LEFT TEXT */}
           <div>
             <h1 className="text-4xl md:text-5xl font-bold leading-tight text-slate-900">
-              Halo-Apotek — Obat Resmi, Aman, & Sampai ke Rumah
+              Halo-Apotek —{" "}
+              <span className="border-r-2 border-sky-500 pr-1">{typed}</span>
             </h1>
 
-            <p className="mt-4 text-slate-600 text-sm md:text-base">
-              Pesan obat tanpa antre, konsultasi dengan apoteker, dan lacak
-              pesanan kamu secara real-time langsung dari satu aplikasi.
+            <p className="mt-4 text-slate-700 text-sm md:text-base font-medium relative inline-block animate-[highlight_4s_ease-in-out_infinite]">
+              Pesan obat tanpa antre,{" "}
+              <span className="font-semibold text-sky-700">
+                konsultasi dengan apoteker
+              </span>
+              , dan lacak pesanan kamu secara real-time langsung dari satu aplikasi.
             </p>
 
-            {/* search bar */}
-            <div className="mt-6 bg-white/80 backdrop-blur border border-slate-200 rounded-2xl shadow-sm flex items-center p-2">
+            {/* SEARCH BAR */}
+            <form
+              onSubmit={onSearchSubmit}
+              className="mt-6 bg-white/80 backdrop-blur border border-slate-200 rounded-2xl shadow-sm flex items-center p-2"
+            >
               <input
                 className="flex-1 px-3 py-2 outline-none text-sm md:text-base bg-transparent"
-                placeholder="Cari obat atau vitamin..."
+                placeholder={`Cari ${placeholder}...`}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
-              <button className="px-4 py-2 rounded-xl bg-sky-600 text-white text-sm font-medium hover:bg-sky-700 transition">
+              <button
+                type="submit"
+                className="px-4 py-2 rounded-xl bg-sky-600 text-white text-sm font-medium hover:bg-sky-700 transition"
+              >
                 Cari
               </button>
-            </div>
+            </form>
 
-            {/* CTA */}
             <div className="mt-6 flex flex-wrap gap-3">
-              <button className="px-5 py-3 rounded-xl bg-sky-600 text-white text-sm md:text-base font-semibold hover:bg-sky-700 transition">
+              <button
+                type="button"
+                onClick={() => goToObat(true)}
+                className="px-5 py-3 rounded-xl bg-sky-600 text-white font-semibold hover:bg-sky-700 transition"
+              >
                 Pesan Sekarang
               </button>
-              <button className="px-5 py-3 rounded-xl border border-slate-300 text-slate-700 text-sm md:text-base hover:bg-slate-50 transition">
+              <button
+                type="button"
+                className="px-5 py-3 rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-50 transition"
+              >
                 Konsultasi Apoteker
               </button>
             </div>
 
-            {/* mini trust row */}
             <div className="mt-5 flex flex-wrap gap-4 text-xs text-slate-500">
               <span>✓ Obat resmi & bersertifikat</span>
               <span>✓ Pengiriman 1–3 jam area tertentu</span>
@@ -139,13 +229,14 @@ export default function Hero() {
           {/* RIGHT CARD */}
           <div className="flex justify-center md:justify-end">
             <div className="relative">
-              <div className="w-72 md:w-80 h-52 md:h-64 rounded-3xl bg-white shadow-xl border border-slate-100 p-4 flex flex-col justify-between">
+              <div className="w-72 md:w-80 h-52 md:h-64 rounded-3xl bg-white shadow-xl border border-slate-100 p-4 flex flex-col justify-between animate-[float_4s_ease-in-out_infinite] relative overflow-hidden">
                 <div>
                   <p className="text-xs text-slate-500">Pesanan Aktif</p>
-                  <p className="text-lg font-semibold text-slate-900 mt-1">
+                  <p className="text-lg font-semibold text-slate-900 mt-1 animate-pulse">
                     Paket obat sedang diantar
                   </p>
                 </div>
+
                 <div className="flex items-center justify-between text-xs text-slate-500">
                   <div>
                     <p className="text-[11px]">Estimasi tiba</p>
@@ -153,10 +244,12 @@ export default function Hero() {
                   </div>
                   <div className="text-right">
                     <p className="text-[11px]">Kurir</p>
-                    <p className="font-semibold text-slate-800">
-                      Rendi • HLO-092
-                    </p>
+                    <p className="font-semibold text-slate-800">Rendi • HLO-092</p>
                   </div>
+                </div>
+
+                <div className="absolute bottom-0 left-0 w-full h-1 bg-slate-100">
+                  <div className="h-full bg-sky-500 animate-[progress_4s_linear_infinite]" />
                 </div>
               </div>
 
@@ -167,6 +260,22 @@ export default function Hero() {
           </div>
         </div>
       </div>
+
+      <style>{`
+        @keyframes float {
+          0%,100% { transform: translateY(0); }
+          50% { transform: translateY(-4px); }
+        }
+        @keyframes progress {
+          0% { transform: translateX(-100%); }
+          100% { transform: translateX(100%); }
+        }
+        @keyframes highlight {
+          0%,100% { background-color: transparent; }
+          40% { background-color: rgba(186, 230, 253, 0.35); }
+          60% { background-color: rgba(186, 230, 253, 0.35); }
+        }
+      `}</style>
     </section>
   );
 }

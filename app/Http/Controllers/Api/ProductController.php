@@ -36,7 +36,7 @@ class ProductController extends Controller
             if ($product->image && Storage::exists('public/' . $product->image)) {
                 Storage::delete('public/' . $product->image);
             }
-            
+
             // 2. Simpan gambar baru
             $data['image'] = $request->file('image')->store('products', 'public');
         }
@@ -64,5 +64,16 @@ class ProductController extends Controller
             'message' => 'Produk berhasil dihapus permanen'
         ]);
     }
+
+    // Fitur: Detail Produk (untuk Edit)
+public function show($id)
+{
+    $product = Product::findOrFail($id);
+
+    return response()->json([
+        'message' => 'Detail produk ditemukan',
+        'data' => new \App\Http\Resources\ProductResource($product)
+    ]);
+}
 
 }

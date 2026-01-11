@@ -16,7 +16,7 @@ class UserController extends Controller
 
         // Pastikan role diisi, kalau kosong default pembeli
         $validated['role'] = $validated['role'] ?? 'pembeli';
-        
+
         // Enkripsi Password
         $validated['password'] = bcrypt($validated['password']);
 
@@ -27,7 +27,7 @@ class UserController extends Controller
             'data' => $user // Anda bisa pakai UserResource di sini jika mau lebih rapi
         ], 201);
     }
-    
+
     // Fitur: List Semua User (Opsional, buat Admin lihat staff)
     public function index() {
         return response()->json(User::all());
@@ -55,4 +55,15 @@ class UserController extends Controller
             'message' => 'User berhasil dihapus permanen.'
         ]);
     }
+
+    public function show($id)
+{
+    // Cari user, jika tidak ditemukan otomatis 404
+    $user = User::findOrFail($id);
+
+    return response()->json([
+        'message' => 'Detail user ditemukan',
+        'data' => $user
+    ]);
+}
 }

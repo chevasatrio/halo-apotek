@@ -56,12 +56,14 @@ Route::middleware(['auth:sanctum'])->group(function () {
         // Manajemen User (Admin buat akun staff)
         Route::get('/users', [UserController::class, 'index']);
         Route::post('/users', [UserController::class, 'store']);
+        Route::get('/users/{id}', [UserController::class, 'show']); //get user detail
 
         // Manajemen Produk
         Route::post('/products', [ProductController::class, 'store']);
         // Update Produk (Pakai POST agar bisa upload file/gambar)
         Route::post('/products/{id}', [ProductController::class, 'update']);
         Route::delete('/products/{id}', [ProductController::class, 'destroy']);
+        Route::get('/products/{id}', [ProductController::class, 'show']); //get product detail
 
         // Proses Transaksi (Lifecycle)
         Route::post('/transaction/{id}/verify', [TransactionController::class, 'verifyPayment']); // Verifikasi Bukti Bayar

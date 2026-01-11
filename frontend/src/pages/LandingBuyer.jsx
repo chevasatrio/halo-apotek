@@ -9,7 +9,7 @@ import "../index.css";
 
 export default function LandingBuyer() {
   return (
-    
+
     <div className="landing-wrapper">
       <Hero />
       <WhyUs />
