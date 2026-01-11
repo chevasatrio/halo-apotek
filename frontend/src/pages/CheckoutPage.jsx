@@ -1,7 +1,6 @@
-// src/pages/CheckoutPage.jsx
-import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import api from "../services/api"; // sesuaikan bila path berbeda
+// src/pages/CheckoutPage.jsx (DUMMY UI ONLY - NO API)
+import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 
 function formatRupiah(n) {
     const num = Number(n || 0);
@@ -116,6 +115,99 @@ export default function CheckoutPage() {
         } finally {
             setSubmitting(false);
         }
+function StepDot({ state }) {
+  // state: "done" | "current" | "todo"
+  const base =
+    "relative flex h-8 w-8 items-center justify-center rounded-full border transition-all duration-300";
+  const styles =
+    state === "done"
+      ? "bg-slate-900 border-slate-900 text-white"
+      : state === "current"
+      ? "bg-white border-slate-900 text-slate-900 shadow-sm"
+      : "bg-white border-slate-200 text-slate-400";
+
+  return (
+    <div className={`${base} ${styles}`}>
+      {state === "done" ? (
+        <svg
+          className="h-4 w-4"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M20 6L9 17l-5-5" />
+        </svg>
+      ) : (
+        <span className="text-xs font-semibold">•</span>
+      )}
+
+      {state === "current" ? (
+        <span className="absolute -inset-1 rounded-full border border-slate-300 animate-pulse" />
+      ) : null}
+    </div>
+  );
+}
+
+export default function CheckoutPage() {
+  // ===== DUMMY MODE FLAGS =====
+  const [loading] = useState(false); // set true kalau mau lihat skeleton
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+
+  // ===== DUMMY DATA =====
+  const [cartItems] = useState([
+    {
+      id: 5,
+      quantity: 3,
+      product: { id: 1, name: "Paracetamol 500mg", price: 5000 },
+    },
+    {
+      id: 6,
+      quantity: 1,
+      product: { id: 2, name: "Amoxicillin", price: 12000 },
+    },
+  ]);
+
+  const [address, setAddress] = useState("");
+  const [note, setNote] = useState("");
+
+  // ===== DUMMY PROGRESS =====
+  const steps = [
+    { key: "pending", label: "Checkout", helper: "Transaksi dibuat (pending)" },
+    { key: "paid", label: "Upload bukti bayar", helper: "Pembayaran diunggah (paid)" },
+    { key: "processing", label: "Verifikasi", helper: "Admin verifikasi (processing)" },
+    { key: "shipping", label: "Pengiriman", helper: "Driver mengantar (shipping)" },
+    { key: "completed", label: "Selesai", helper: "Pesanan selesai (completed)" },
+  ];
+  const [activeStep, setActiveStep] = useState(0);
+
+  const { itemCount, subtotal } = useMemo(() => {
+    const count = cartItems.reduce((acc, it) => acc + Number(it.quantity || 0), 0);
+    const sum = cartItems.reduce((acc, it) => {
+      const price = Number(it?.product?.price || 0);
+      const qty = Number(it?.quantity || 0);
+      return acc + price * qty;
+    }, 0);
+    return { itemCount: count, subtotal: sum };
+  }, [cartItems]);
+
+  async function handleCheckout() {
+    setError("");
+    setSubmitting(true);
+    try {
+      await new Promise((r) => setTimeout(r, 600));
+      alert(
+        `DUMMY CHECKOUT\n\nAlamat:\n${address || "-"}\n\nCatatan:\n${note || "-"}\n\nTotal: ${formatRupiah(
+          subtotal
+        )}`
+      );
+    } catch (e) {
+      setError("Checkout dummy gagal.");
+    } finally {
+      setSubmitting(false);
     }
 
     return (
@@ -170,6 +262,124 @@ export default function CheckoutPage() {
                                         users.address
                                     </span>
                                     .
+            <div className="flex items-center gap-2">
+              <Link
+                to="/pembeli/cart"
+                className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+              >
+                Kembali
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Body */}
+      <div className="mx-auto max-w-6xl px-4 py-8">
+        {error ? (
+          <div className="mb-6 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+            {error}
+          </div>
+        ) : null}
+
+        <div className="grid gap-6 lg:grid-cols-12">
+          {/* LEFT */}
+          <div className="lg:col-span-8 space-y-6">
+            {/* Address (ONLY address, no note/status) */}
+            <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+              <div className="border-b border-slate-100 px-5 py-4">
+                <h2 className="text-base font-semibold text-slate-900">Alamat Pengiriman</h2>
+                <p className="mt-1 text-sm text-slate-600">
+                  Sementara isi manual dulu. Nanti kita sambungkan ke{" "}
+                  <span className="font-semibold">users.address</span>.
+                </p>
+              </div>
+
+              <div className="px-5 py-5">
+                <label className="block text-sm font-semibold text-slate-700">Alamat</label>
+                <textarea
+                  rows={4}
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                  placeholder="Masukkan alamat lengkap..."
+                  className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none focus:border-slate-300 focus:ring-2 focus:ring-slate-200"
+                />
+              </div>
+            </div>
+
+            {/* Items + NOTE moved here */}
+            <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+              <div className="border-b border-slate-100 px-5 py-4">
+                <h2 className="text-base font-semibold text-slate-900">Item Pesanan</h2>
+                <p className="mt-1 text-sm text-slate-600">
+                  (Dummy) Ringkasan item ditampilkan dari data statis.
+                </p>
+              </div>
+
+              <div className="px-5 py-4">
+                {/* Note moved here */}
+                <div className="mb-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-900">Catatan</p>
+                      <p className="mt-1 text-sm text-slate-600">
+                        Opsional. Nanti bisa kita ikutkan ke backend jika diperlukan.
+                      </p>
+                    </div>
+                    <span className="text-xs font-semibold text-slate-500">Optional</span>
+                  </div>
+
+                  <input
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                    className="mt-3 w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 shadow-sm outline-none focus:border-slate-300 focus:ring-2 focus:ring-slate-200"
+                    placeholder="Contoh: hubungi sebelum sampai"
+                  />
+                </div>
+
+                {loading ? (
+                  <div className="space-y-4">
+                    {[1, 2].map((i) => (
+                      <div key={i} className="flex items-center gap-4">
+                        <SkeletonLine className="h-10 w-10" />
+                        <div className="flex-1 space-y-2">
+                          <SkeletonLine className="h-4 w-2/3" />
+                          <SkeletonLine className="h-4 w-1/3" />
+                        </div>
+                        <SkeletonLine className="h-6 w-24" />
+                      </div>
+                    ))}
+                  </div>
+                ) : cartItems.length ? (
+                  <ul className="divide-y divide-slate-100">
+                    {cartItems.map((it) => {
+                      const name = it?.product?.name || "Produk";
+                      const price = Number(it?.product?.price || 0);
+                      const qty = Number(it?.quantity || 0);
+                      const lineTotal = price * qty;
+
+                      return (
+                        <li key={it.id} className="py-4">
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="flex items-start gap-4">
+                              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-600">
+                                <svg
+                                  viewBox="0 0 24 24"
+                                  className="h-5 w-5"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="1.8"
+                                >
+                                  <path d="M10.5 6.5l7 7a4 4 0 01-5.657 5.657l-7-7A4 4 0 0110.5 6.5z" />
+                                  <path d="M14 8l2 2" />
+                                </svg>
+                              </div>
+
+                              <div>
+                                <p className="text-sm font-semibold text-slate-900">{name}</p>
+                                <p className="mt-1 text-sm text-slate-600">
+                                  {formatRupiah(price)}{" "}
+                                  <span className="text-slate-400">×</span> {qty}
                                 </p>
                             </div>
 
@@ -222,6 +432,54 @@ export default function CheckoutPage() {
                                 </div>
                             </div>
                         </div>
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : (
+                  <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center">
+                    <p className="text-sm font-semibold text-slate-800">Keranjang kosong</p>
+                    <p className="mt-1 text-sm text-slate-600">
+                      Tambahkan produk dulu, lalu checkout.
+                    </p>
+                    <Link
+                      to="/pembeli/obat"
+                      className="mt-4 inline-flex rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-slate-800"
+                    >
+                      Lihat Produk
+                    </Link>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* RIGHT */}
+          <div className="lg:col-span-4">
+            <div className="sticky top-6 space-y-6">
+              {/* Summary */}
+              <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+                <div className="border-b border-slate-100 px-5 py-4">
+                  <h2 className="text-base font-semibold text-slate-900">Ringkasan</h2>
+                </div>
+
+                <div className="px-5 py-5">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-slate-600">Item</span>
+                      <span className="font-semibold text-slate-900">{itemCount}</span>
+                    </div>
+
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-slate-600">Subtotal</span>
+                      <span className="font-semibold text-slate-900">{formatRupiah(subtotal)}</span>
+                    </div>
+
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-slate-600">Ongkir</span>
+                      <span className="font-semibold text-slate-900">{formatRupiah(0)}</span>
+                    </div>
 
                         {/* Items */}
                         <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -401,6 +659,14 @@ export default function CheckoutPage() {
                           loading || submitting || !cartItems.length
                               ? "bg-slate-200 text-slate-500 cursor-not-allowed"
                               : "bg-slate-900 text-white hover:bg-slate-800"
+                  <button
+                    onClick={handleCheckout}
+                    disabled={submitting || !cartItems.length}
+                    className={`mt-5 w-full rounded-xl px-4 py-3 text-sm font-semibold shadow-sm transition
+                      ${
+                        submitting || !cartItems.length
+                          ? "bg-slate-200 text-slate-500 cursor-not-allowed"
+                          : "bg-slate-900 text-white hover:bg-slate-800"
                       }`}
                                     >
                                         {submitting
@@ -460,6 +726,125 @@ export default function CheckoutPage() {
                         </div>
                     </div>
                 </div>
+                  <p className="mt-3 text-xs leading-relaxed text-slate-500">
+                    (Dummy) Ini hanya preview UI. Nanti baru kita sambungkan ke API.
+                  </p>
+                </div>
+              </div>
+
+              {/* Progress (Vertical interactive) */}
+              <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+                <div className="border-b border-slate-100 px-5 py-4">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-base font-semibold text-slate-900">Alur Status</h2>
+                    <span className="text-xs font-semibold text-slate-500">
+                      Step {activeStep + 1}/{steps.length}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-sm text-slate-600">
+                    (Dummy) Klik step untuk melihat simulasi progres.
+                  </p>
+                </div>
+
+                <div className="px-5 py-5">
+                  <ol className="relative">
+                    {/* vertical line */}
+                    <div className="absolute left-4 top-2 bottom-2 w-px bg-slate-200" />
+
+                    <div className="space-y-4">
+                      {steps.map((s, idx) => {
+                        const state =
+                          idx < activeStep ? "done" : idx === activeStep ? "current" : "todo";
+
+                        return (
+                          <li key={s.key} className="relative flex items-start gap-4">
+                            <button
+                              type="button"
+                              onClick={() => setActiveStep(idx)}
+                              className="group relative z-10"
+                              aria-label={`Set step ${idx + 1}`}
+                            >
+                              <StepDot state={state} />
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => setActiveStep(idx)}
+                              className={`flex-1 rounded-xl border px-4 py-3 text-left transition-all duration-300
+                                ${
+                                  idx === activeStep
+                                    ? "border-slate-300 bg-slate-50 shadow-sm"
+                                    : "border-slate-200 bg-white hover:bg-slate-50"
+                                }`}
+                            >
+                              <div className="flex items-start justify-between gap-3">
+                                <div>
+                                  <p
+                                    className={`text-sm font-semibold ${
+                                      idx === activeStep ? "text-slate-900" : "text-slate-800"
+                                    }`}
+                                  >
+                                    {idx + 1}. {s.label}
+                                  </p>
+                                  <p className="mt-1 text-sm text-slate-600">{s.helper}</p>
+                                </div>
+
+                                <span
+                                  className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold transition
+                                    ${
+                                      idx === activeStep
+                                        ? "bg-slate-900 text-white"
+                                        : idx < activeStep
+                                        ? "bg-slate-100 text-slate-700"
+                                        : "bg-slate-50 text-slate-500"
+                                    }`}
+                                >
+                                  {s.key}
+                                </span>
+                              </div>
+
+                              {idx === activeStep ? (
+                                <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-slate-200">
+                                  <div className="h-full w-full origin-left animate-[progress_900ms_ease-out] bg-slate-900" />
+                                </div>
+                              ) : null}
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </div>
+                  </ol>
+
+                  {/* Tailwind keyframes via arbitrary animation needs @keyframes in CSS.
+                      Kita bikin fallback: gunakan inline style di bawah.
+                  */}
+                  <style>{`
+                    @keyframes progress {
+                      0% { transform: scaleX(0); }
+                      100% { transform: scaleX(1); }
+                    }
+                  `}</style>
+                </div>
+              </div>
+
+              {/* Tips (tetap oke, tapi dibuat lebih “useful”) */}
+              <div className="rounded-2xl border border-slate-200 bg-slate-900 p-5 shadow-sm">
+                <p className="text-sm font-semibold text-white">Info Penting</p>
+                <ul className="mt-3 space-y-2 text-sm text-slate-200">
+                  <li className="flex gap-2">
+                    <span className="mt-1 h-1.5 w-1.5 rounded-full bg-slate-200" />
+                    <span>Pastikan alamat lengkap agar pengiriman tidak tertunda.</span>
+                  </li>
+                  <li className="flex gap-2">
+                    <span className="mt-1 h-1.5 w-1.5 rounded-full bg-slate-200" />
+                    <span>Periksa ulang item dan jumlah sebelum checkout.</span>
+                  </li>
+                  <li className="flex gap-2">
+                    <span className="mt-1 h-1.5 w-1.5 rounded-full bg-slate-200" />
+                    <span>Jika stok tidak cukup, backend akan menolak checkout (nanti saat API aktif).</span>
+                  </li>
+                </ul>
+              </div>
             </div>
         </div>
     );
