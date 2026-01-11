@@ -13,22 +13,20 @@ class TransactionResource extends JsonResource
             'id' => $this->id,
             'invoice_code' => $this->invoice_code,
             'total_amount' => $this->total_amount,
-            'total_formatted' => 'Rp ' . number_format($this->total_amount, 0, ',', '.'),
-            'status' => ucfirst($this->status), // misal: 'Pending'
-            'payment_proof' => $this->payment_proof ? url('storage/' . $this->payment_proof) : null,
-            'transaction_date' => $this->created_at->format('d M Y H:i'), // Format tanggal cantik
-            
-            // Relasi ke User (Pembeli)
-            'buyer_name' => $this->user->name,
+            'status' => $this->status,
+            'payment_proof' => $this->payment_proof,
+            'delivery_proof' => $this->delivery_proof,
+            'address' => $this->address ?? 'Alamat tidak tersedia',
 
-            // Relasi ke Driver (jika ada) - Menggunakan whenLoaded agar hemat query
-            'driver' => $this->when($this->driver_id, function () {
-                 return $this->driver ? $this->driver->name : null;
-            }),
+            // --- PERBAIKAN 1: Pastikan Tanggal Dikirim ---
+            'created_at' => $this->created_at,
+            'updated_at' => $this->updated_at,
 
-            // Relasi Item Belanja (Panggil resource detail tadi)
-            // Menggunakan whenLoaded('details') agar tidak error jika relasi belum di-load
-            'items' => TransactionDetailResource::collection($this->whenLoaded('details')),
+            // --- PERBAIKAN 2: Pastikan Data User & Driver Dikirim ---
+            // 'whenLoaded' mencegah error jika relasi belum dipanggil controller
+            'user' => $this->whenLoaded('user'),
+            'driver' => $this->whenLoaded('driver'),
+            'details' => TransactionDetailResource::collection($this->whenLoaded('details')),
         ];
     }
 }

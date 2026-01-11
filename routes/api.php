@@ -35,8 +35,8 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::get('/cart', [CartController::class, 'myCart']);
         Route::put('/cart/{id}', [CartController::class, 'update']);
         Route::delete('/cart/{id}', [CartController::class, 'destroy']);
-        
-        Route::post('/checkout', [TransactionController::class, 'checkout']); 
+
+        Route::post('/checkout', [TransactionController::class, 'checkout']);
         Route::post('/transaction/{id}/pay', [TransactionController::class, 'uploadPayment']);
         Route::get('/my-orders', [TransactionController::class, 'myHistory']);
     });
@@ -53,20 +53,26 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::get('/users/{id}', [UserController::class, 'show']); //get user detail
         Route::delete('/users/{id}', [UserController::class, 'destroy']);
         Route::put('/users/{id}', [UserController::class, 'update']);
-        
+
         // --- ROUTE BARU: Lihat Daftar Driver ---
-        Route::get('/drivers', [UserController::class, 'getDrivers']); 
+        Route::get('/drivers', [UserController::class, 'getDrivers']);
+
+
 
         // Product Management
         Route::post('/products', [ProductController::class, 'store']);
-        Route::post('/products/{id}', [ProductController::class, 'update']); 
+        Route::post('/products/{id}', [ProductController::class, 'update']);
         Route::delete('/products/{id}', [ProductController::class, 'destroy']);
         Route::get('/products/{id}', [ProductController::class, 'show']); //get product detail
 
         // Transaction Process
-        Route::post('/transaction/{id}/verify', [TransactionController::class, 'verifyPayment']); 
+
+        Route::get('/transactions/{id}', [TransactionController::class, 'show']);
+        Route::put('/transactions/{id}', [TransactionController::class, 'update']);
+
+        Route::post('/transaction/{id}/verify', [TransactionController::class, 'verifyPayment']);
         Route::post('/transaction/{id}/assign', [TransactionController::class, 'assignDriver']); // Input: driver_id (ID User Driver)
-        Route::post('/transaction/{id}/complete-direct', [TransactionController::class, 'completeDirectly']); 
+        Route::post('/transaction/{id}/complete-direct', [TransactionController::class, 'completeDirectly']);
     });
 
     // --- ROLE: DRIVER ---
