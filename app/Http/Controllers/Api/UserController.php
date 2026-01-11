@@ -4,24 +4,43 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreUserRequest;
-use App\Models\User;
+use App\Models\User; // <--- JANGAN LUPA IMPORT INI
 use Illuminate\Http\Request;
 
 class UserController extends Controller
 {
-    // List Semua User (Admin)
+    /**
+     * List Semua User (Admin)
+     * Method ini menangani error 500 sebelumnya.
+     */
     public function index() {
         return response()->json(User::all());
     }
 
-    // --- TAMBAHAN BARU: List Khusus Driver (Agar Admin tau ID nya) ---
+    /**
+     * List Khusus Driver (Agar Admin tau ID nya)
+     */
     public function getDrivers() {
-        // Ambil hanya yang role-nya driver
         $drivers = User::where('role', 'driver')->get();
         return response()->json($drivers);
     }
 
-    // Create User Baru (Admin)
+    /**
+     * Detail Satu User
+     */
+    public function show($id)
+    {
+        $user = User::findOrFail($id);
+
+        return response()->json([
+            'message' => 'Detail user ditemukan',
+            'data' => $user
+        ]);
+    }
+
+    /**
+     * Create User Baru (Admin)
+     */
     public function store(StoreUserRequest $request)
     {
         $validated = $request->validated();
@@ -38,12 +57,9 @@ class UserController extends Controller
         ], 201);
     }
 
-    // Fitur: List Semua User (Opsional, buat Admin lihat staff)
-    public function index() {
-        return response()->json(User::all());
-    }
-
-    // Hapus User (Admin)
+    /**
+     * Hapus User (Admin)
+     */
     public function destroy($id)
     {
         $user = User::findOrFail($id);
@@ -57,14 +73,34 @@ class UserController extends Controller
         return response()->json(['message' => 'User berhasil dihapus permanen.']);
     }
 
-    public function show($id)
-{
-    // Cari user, jika tidak ditemukan otomatis 404
-    $user = User::findOrFail($id);
+    public function update(Request $request, $id)
+    {
+        $user = User::findOrFail($id);
 
-    return response()->json([
-        'message' => 'Detail user ditemukan',
-        'data' => $user
-    ]);
-}
+        // Validasi Manual di sini agar praktis (tanpa buat file Request baru)
+        $validated = $request->validate([
+            'name'     => 'required|string|max:255',
+            // Email harus unik, KECUALI milik user ini sendiri
+            'email'    => 'required|email|unique:users,email,' . $user->id, 
+            'role'     => 'required|in:admin,kasir,driver,pembeli',
+            'password' => 'nullable|string|min:8', // Password opsional saat edit
+        ]);
+
+        // Update data dasar
+        $user->name  = $validated['name'];
+        $user->email = $validated['email'];
+        $user->role  = $validated['role'];
+
+        // Cek apakah admin mengisi password baru?
+        if ($request->filled('password')) {
+            $user->password = bcrypt($validated['password']);
+        }
+
+        $user->save();
+
+        return response()->json([
+            'message' => 'Data user berhasil diperbarui',
+            'data'    => $user
+        ]);
+    }
 }

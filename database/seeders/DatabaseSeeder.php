@@ -53,5 +53,7 @@ class DatabaseSeeder extends Seeder
             'stock' => 50,
             'image' => 'obat2.jpg'
         ]);
+
+        $this->call(ProductSeeder::class);
     }
 }

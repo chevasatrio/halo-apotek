@@ -31,14 +31,14 @@ class TransactionController extends Controller
 
         try {
             $result = DB::transaction(function () use ($cartItems, $user, $validatedData) {
-                
+
                 $totalAmount = 0;
 
                 // A. Buat Header Transaksi
                 $transaction = Transaction::create([
                     'user_id' => $user->id,
                     'invoice_code' => 'INV-' . time() . rand(100, 999),
-                    'total_amount' => 0, 
+                    'total_amount' => 0,
                     'status' => 'pending',
                     'address' => $validatedData['address'] ?? $user->address ?? 'Alamat tidak diisi',
                 ]);
@@ -70,7 +70,7 @@ class TransactionController extends Controller
                 // C. Kosongkan Keranjang
                 Cart::where('user_id', $user->id)->delete();
 
-                $transaction->load(['details.product', 'user']); 
+                $transaction->load(['details.product', 'user']);
 
                 return $transaction;
             });
@@ -105,7 +105,7 @@ class TransactionController extends Controller
 
         if ($request->hasFile('payment_proof')) {
             $path = $request->file('payment_proof')->store('payment_proofs', 'public');
-            
+
             $transaction->update([
                 'payment_proof' => $path,
                 'status' => 'paid'
@@ -144,15 +144,15 @@ class TransactionController extends Controller
         ]);
 
         $transaction = Transaction::findOrFail($id);
-        
+
         // Cek status valid
         if (!in_array($transaction->status, ['processing', 'paid'])) {
-             return response()->json(['message' => 'Transaksi belum siap dikirim (Cek status).'], 400);
+            return response()->json(['message' => 'Transaksi belum siap dikirim (Cek status).'], 400);
         }
 
         // 2. Cek apakah ID tersebut benar-benar memiliki role 'driver'
         $driver = User::where('id', $request->driver_id)->where('role', 'driver')->first();
-        
+
         if (!$driver) {
             return response()->json(['message' => 'ID User tersebut valid, tetapi bukan role Driver.'], 400);
         }
@@ -181,8 +181,8 @@ class TransactionController extends Controller
 
         $transaction->update([
             'status' => 'completed',
-            'driver_id' => null, 
-            'delivery_proof' => 'taken_in_store.jpg' 
+            'driver_id' => null,
+            'delivery_proof' => 'taken_in_store.jpg'
         ]);
 
         return response()->json(['message' => 'Transaksi selesai (Ambil di tempat).']);
@@ -210,7 +210,7 @@ class TransactionController extends Controller
 
             return response()->json(['message' => 'Pesanan selesai diantar.']);
         }
-        
+
         return response()->json(['message' => 'Gagal upload bukti.'], 400);
     }
 
@@ -237,9 +237,9 @@ class TransactionController extends Controller
         $query = Transaction::with(['user', 'details.product', 'driver'])->orderBy('created_at', 'desc');
 
         if (auth()->user()->role === 'driver') {
-            $query->where(function($q) {
+            $query->where(function ($q) {
                 $q->where('driver_id', auth()->id())
-                  ->orWhere('status', 'shipping');
+                    ->orWhere('status', 'shipping');
             });
         }
 
@@ -249,4 +249,53 @@ class TransactionController extends Controller
             'data' => TransactionResource::collection($transactions)
         ]);
     }
+
+    public function show($id)
+    {
+        // Cari transaksi dengan relasi user, details, product, dan driver
+        $transaction = Transaction::with(['user', 'details.product', 'driver'])->findOrFail($id);
+
+        // Cek otorisasi sederhana (Opsional)
+        // Jika driver, pastikan dia hanya bisa lihat tugasnya sendiri
+        if (auth()->user()->role === 'driver') {
+            if ($transaction->driver_id !== auth()->id() && $transaction->status !== 'shipping') {
+                return response()->json(['message' => 'Anda tidak memiliki akses ke transaksi ini.'], 403);
+            }
+        }
+
+        return new TransactionResource($transaction);
+    }
+
+    /**
+     * UPDATE TRANSAKSI MANUAL (Untuk Admin)
+     */
+    public function update(Request $request, $id)
+    {
+        $transaction = Transaction::findOrFail($id);
+
+        $validated = $request->validate([
+            'status' => 'required|in:pending,paid,processing,shipping,completed,cancelled',
+            'driver_id' => 'nullable|exists:users,id',
+        ]);
+
+        $transaction->status = $validated['status'];
+
+        if ($request->has('driver_id')) {
+            $transaction->driver_id = $validated['driver_id'];
+        }
+
+        $transaction->save();
+
+        // --- PERBAIKAN UTAMA DI SINI ---
+        // Kita paksa muat ulang data Driver & User supaya Frontend langsung tahu namanya
+        $transaction->load(['driver', 'user']);
+        // -------------------------------
+
+        return response()->json([
+            'message' => 'Transaksi berhasil diperbarui',
+            // Kembalikan via Resource agar formatnya konsisten (ada nama driver, tanggal, dll)
+            'data' => new TransactionResource($transaction)
+        ]);
+    }
+
 }

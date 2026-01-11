@@ -8,16 +8,15 @@ import Footer from "../components/landing/Footer";
 import "../index.css";
 
 export default function LandingBuyer() {
-  return (
-
-    <div className="landing-wrapper">
-      <Hero />
-      <WhyUs />
-      <FeaturedProduct/>
-      <MeetPharmacist />
-      <Support />
-      <Services />
-      <Footer />
-    </div>
-  );
+    return (
+        <div className="landing-wrapper">
+            <Hero />
+            <WhyUs />
+            <FeaturedProduct />
+            <MeetPharmacist />
+            <Support />
+            <Services />
+            <Footer />
+        </div>
+    );
 }
