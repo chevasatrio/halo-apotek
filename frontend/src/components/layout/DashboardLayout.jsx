@@ -1,29 +1,39 @@
 import { Outlet, NavLink, Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../Context/AuthContext.jsx";
 
-export default function DashboardLayout() {
-  const { token, user, logout, booting } = useAuth();
-  const location = useLocation();
-
-  // tunggu booting (fetch /api/user) selesai
-  if (booting) return null;
-
-  // kalau belum login, lempar ke login
-  if (!token || !user) return <Navigate to="/login" replace />;
-
-  // optional: dashboard hanya untuk admin
-  if (user.role !== "admin") return <Navigate to="/unauthorized" replace />;
-
-  const menus = [
+const MENU_BY_ROLE = {
+  admin: [
     { label: "Dashboard", to: "/dashboard" },
     { label: "Data Obat", to: "/dashboard/obat" },
     { label: "Transaksi", to: "/dashboard/transaksi" },
     { label: "Pengguna", to: "/dashboard/pegawai" },
     { label: "Driver", to: "/dashboard/driver" },
-  ];
+  ],
+  kasir: [{ label: "Transaksi", to: "/dashboard/transaksi" }],
+  driver: [{ label: "Driver", to: "/dashboard/driver" }],
+};
 
+export default function DashboardLayout() {
+  const { token, user, logout, booting } = useAuth();
+  const location = useLocation();
+
+  if (booting) return null;
+  if (!token || !user) return <Navigate to="/login" replace />;
+
+  const role = String(user?.role || "").toLowerCase().trim();
+
+  // yang boleh masuk area /dashboard hanya admin/kasir/driver
+  const allowedDashboardRoles = ["admin", "kasir", "driver"];
+  if (!allowedDashboardRoles.includes(role)) {
+    return <Navigate to="/unauthorized" replace />;
+  }
+
+  const menus = MENU_BY_ROLE[role] || [];
+
+  // title: cari yang paling cocok berdasarkan path
   const pageTitle =
-    menus.find((m) => location.pathname.startsWith(m.to))?.label || "Dashboard";
+    menus.find((m) => location.pathname === m.to || location.pathname.startsWith(m.to + "/"))
+      ?.label || "Dashboard";
 
   const name = user?.name || "User";
 
@@ -35,7 +45,7 @@ export default function DashboardLayout() {
         <div className="px-6 py-5 border-b">
           <h1 className="text-xl font-semibold text-sky-700">Halo-Apotek</h1>
           <p className="text-xs text-gray-400 mt-1">
-            Dashboard — {(user.role || "").toUpperCase()}
+            Dashboard — {(role || "").toUpperCase()}
           </p>
         </div>
 
@@ -53,6 +63,7 @@ export default function DashboardLayout() {
                     : "hover:bg-slate-50 hover:text-sky-700"
                 }`
               }
+              end={m.to === "/dashboard"} // supaya /dashboard aktif hanya di root
             >
               {m.label}
             </NavLink>

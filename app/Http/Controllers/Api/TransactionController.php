@@ -117,6 +117,25 @@ class TransactionController extends Controller
         return response()->json(['message' => 'File gagal diupload'], 400);
     }
 
+
+    public function confirmPaid($id)
+{
+    $transaction = Transaction::where('user_id', auth()->id())->findOrFail($id);
+
+    if ($transaction->status !== 'pending') {
+        return response()->json(['message' => 'Transaksi tidak dalam status pending.'], 400);
+    }
+
+    $transaction->update(['status' => 'paid']);
+
+    $transaction->load(['details.product', 'user', 'driver']);
+
+    return response()->json([
+        'message' => 'Status pembayaran dikonfirmasi.',
+        'data' => new TransactionResource($transaction)
+    ]);
+}
+
     /**
      * FASE 3: VERIFIKASI PEMBAYARAN (ADMIN/KASIR)
      */
@@ -233,22 +252,20 @@ class TransactionController extends Controller
      * LIHAT SEMUA (ADMIN/KASIR/DRIVER)
      */
     public function index()
-    {
-        $query = Transaction::with(['user', 'details.product', 'driver'])->orderBy('created_at', 'desc');
+{
+    $query = Transaction::with(['user', 'details.product', 'driver'])
+        ->orderBy('created_at', 'desc');
 
-        if (auth()->user()->role === 'driver') {
-            $query->where(function ($q) {
-                $q->where('driver_id', auth()->id())
-                    ->orWhere('status', 'shipping');
-            });
-        }
-
-        $transactions = $query->get();
-
-        return response()->json([
-            'data' => TransactionResource::collection($transactions)
-        ]);
+    if (auth()->user()->role === 'driver') {
+        $query->where('driver_id', auth()->id());
     }
+
+    $transactions = $query->get();
+
+    return response()->json([
+        'data' => TransactionResource::collection($transactions)
+    ]);
+}
 
     public function show($id)
     {
@@ -258,10 +275,10 @@ class TransactionController extends Controller
         // Cek otorisasi sederhana (Opsional)
         // Jika driver, pastikan dia hanya bisa lihat tugasnya sendiri
         if (auth()->user()->role === 'driver') {
-            if ($transaction->driver_id !== auth()->id() && $transaction->status !== 'shipping') {
-                return response()->json(['message' => 'Anda tidak memiliki akses ke transaksi ini.'], 403);
-            }
-        }
+    if ($transaction->driver_id !== auth()->id()) {
+        return response()->json(['message' => 'Anda tidak memiliki akses ke transaksi ini.'], 403);
+    }
+}
 
         return new TransactionResource($transaction);
     }
