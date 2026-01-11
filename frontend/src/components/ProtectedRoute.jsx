@@ -5,7 +5,6 @@ export default function ProtectedRoute({ role }) {
   const { token, user, booting } = useAuth();
   const location = useLocation();
 
-  // jangan return null, bikin “kedip”/blank. kasih placeholder ringan.
   if (booting) {
     return (
       <div className="min-h-screen bg-sky-50 flex items-center justify-center">
@@ -19,13 +18,16 @@ export default function ProtectedRoute({ role }) {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   }
 
-  // token ada tapi user belum ada (harusnya jarang)
+  // token ada tapi user belum ada
   if (!user) {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   }
 
-  // role guard
-  if (role && String(user.role).toLowerCase() !== String(role).toLowerCase()) {
+  // role guard (lebih tahan banting)
+  const userRole = String(user?.role || "").toLowerCase().trim();
+  const needRole = String(role || "").toLowerCase().trim();
+
+  if (needRole && userRole !== needRole) {
     return <Navigate to="/unauthorized" replace />;
   }
 

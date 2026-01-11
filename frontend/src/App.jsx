@@ -1,4 +1,5 @@
 import { Routes, Route, Navigate } from "react-router-dom";
+import { useAuth } from "./Context/AuthContext";
 
 import Login from "./pages/Login.jsx";
 import Register from "./pages/Register.jsx";
@@ -15,6 +16,10 @@ import LandingBuyer from "./pages/LandingBuyer";
 import BuyerObatPage from "./pages/BuyerObatPage.jsx";
 import CartPage from "./pages/CartPage.jsx";
 import CheckoutPage from "./pages/CheckoutPage.jsx";
+import PaymentPage from "./pages/PaymentPage.jsx";
+import DeliveryPage from "./pages/DeliveryPage.jsx";
+
+
 import ListTransaksi from "./pages/ListTransaksi.jsx";
 import TransaksiForm from "./pages/TransaksiForm.jsx";
 import DriverList from "./pages/ListDriver.jsx";
@@ -35,6 +40,28 @@ function Unauthorized() {
   );
 }
 
+function RootRedirect() {
+  const { token, user, booting } = useAuth();
+
+  if (booting) {
+    return (
+      <div className="min-h-screen bg-sky-50 flex items-center justify-center">
+        <div className="text-sm text-slate-500">Memuat...</div>
+      </div>
+    );
+  }
+
+  if (!token) return <Navigate to="/login" replace />;
+
+  const role = String(user?.role || "").toLowerCase().trim();
+
+  if (role === "pembeli") return <Navigate to="/pembeli" replace />;
+  if (role === "admin" || role === "kasir" || role === "driver")
+    return <Navigate to="/dashboard" replace />;
+
+  return <Navigate to="/unauthorized" replace />;
+}
+
 function App() {
   return (
     <Routes>
@@ -46,10 +73,11 @@ function App() {
       <Route element={<ProtectedRoute role="pembeli" />}>
         <Route path="/pembeli" element={<LandingBuyer />} />
         <Route path="/pembeli/obat" element={<BuyerObatPage />} />
+        <Route path="/pembeli/cart" element={<CartPage />} />
+        <Route path="/pembeli/checkout" element={<CheckoutPage />} />
+        <Route path="/pembeli/payment" element={<PaymentPage />} />
+        <Route path="/pembeli/delivery" element={<DeliveryPage />} />
       </Route>
-
-      // CART dibuat public
-      <Route path="/cart" element={<CartPage />} />
 
       {/* DASHBOARD (WAJIB LOGIN, ROLE = admin) */}
       <Route element={<ProtectedRoute role="admin" />}>
@@ -66,26 +94,22 @@ function App() {
           <Route path="pegawai/tambah" element={<PegawaiForm />} />
           <Route path="pegawai/:id/edit" element={<PegawaiForm />} />
 
+          {/* TRANSAKSI */}
           <Route path="transaksi" element={<ListTransaksi />} />
-        <Route path="transaksi/:id" element={<TransaksiForm />} />
-        <Route path="transaksi/:id/edit" element={<TransaksiForm />} />
+          <Route path="transaksi/:id" element={<TransaksiForm />} />
+          <Route path="transaksi/:id/edit" element={<TransaksiForm />} />
 
-        <Route path="driver" element={<DriverList />} />
-
+          {/* DRIVER */}
+          <Route path="driver" element={<DriverList />} />
         </Route>
       </Route>
-
-      {/* <Route path="/buyer/checkout" element={<CheckoutPage />} /> */}
-      <Route path="/buyer/checkout" element={<CheckoutPage />} />
 
       {/* UNAUTHORIZED */}
       <Route path="/unauthorized" element={<Unauthorized />} />
 
-      {/* REDIRECT ROOT */}
-      <Route path="/" element={<Navigate to="/dashboard" replace />} />
-
-      {/* 404 */}
-      <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      {/* ROOT & 404 -> redirect sesuai role */}
+      <Route path="/" element={<RootRedirect />} />
+      <Route path="*" element={<RootRedirect />} />
     </Routes>
   );
 }
