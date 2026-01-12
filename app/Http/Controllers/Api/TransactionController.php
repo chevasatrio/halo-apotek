@@ -119,22 +119,22 @@ class TransactionController extends Controller
 
 
     public function confirmPaid($id)
-{
-    $transaction = Transaction::where('user_id', auth()->id())->findOrFail($id);
+    {
+        $transaction = Transaction::where('user_id', auth()->id())->findOrFail($id);
 
-    if ($transaction->status !== 'pending') {
-        return response()->json(['message' => 'Transaksi tidak dalam status pending.'], 400);
+        if ($transaction->status !== 'pending') {
+            return response()->json(['message' => 'Transaksi tidak dalam status pending.'], 400);
+        }
+
+        $transaction->update(['status' => 'paid']);
+
+        $transaction->load(['details.product', 'user', 'driver']);
+
+        return response()->json([
+            'message' => 'Status pembayaran dikonfirmasi.',
+            'data' => new TransactionResource($transaction)
+        ]);
     }
-
-    $transaction->update(['status' => 'paid']);
-
-    $transaction->load(['details.product', 'user', 'driver']);
-
-    return response()->json([
-        'message' => 'Status pembayaran dikonfirmasi.',
-        'data' => new TransactionResource($transaction)
-    ]);
-}
 
     /**
      * FASE 3: VERIFIKASI PEMBAYARAN (ADMIN/KASIR)
@@ -252,20 +252,20 @@ class TransactionController extends Controller
      * LIHAT SEMUA (ADMIN/KASIR/DRIVER)
      */
     public function index()
-{
-    $query = Transaction::with(['user', 'details.product', 'driver'])
-        ->orderBy('created_at', 'desc');
+    {
+        $query = Transaction::with(['user', 'details.product', 'driver'])
+            ->orderBy('created_at', 'desc');
 
-    if (auth()->user()->role === 'driver') {
-        $query->where('driver_id', auth()->id());
+        if (auth()->user()->role === 'driver') {
+            $query->where('driver_id', auth()->id());
+        }
+
+        $transactions = $query->get();
+
+        return response()->json([
+            'data' => TransactionResource::collection($transactions)
+        ]);
     }
-
-    $transactions = $query->get();
-
-    return response()->json([
-        'data' => TransactionResource::collection($transactions)
-    ]);
-}
 
     public function show($id)
     {
@@ -275,10 +275,10 @@ class TransactionController extends Controller
         // Cek otorisasi sederhana (Opsional)
         // Jika driver, pastikan dia hanya bisa lihat tugasnya sendiri
         if (auth()->user()->role === 'driver') {
-    if ($transaction->driver_id !== auth()->id()) {
-        return response()->json(['message' => 'Anda tidak memiliki akses ke transaksi ini.'], 403);
-    }
-}
+            if ($transaction->driver_id !== auth()->id()) {
+                return response()->json(['message' => 'Anda tidak memiliki akses ke transaksi ini.'], 403);
+            }
+        }
 
         return new TransactionResource($transaction);
     }
@@ -286,32 +286,52 @@ class TransactionController extends Controller
     /**
      * UPDATE TRANSAKSI MANUAL (Untuk Admin)
      */
-    public function update(Request $request, $id)
+   public function update(Request $request, $id)
     {
         $transaction = Transaction::findOrFail($id);
 
+        // 1. Validasi Input
         $validated = $request->validate([
-            'status' => 'required|in:pending,paid,processing,shipping,completed,cancelled',
+            'status'    => 'required|in:pending,paid,processing,shipping,completed,cancelled',
             'driver_id' => 'nullable|exists:users,id',
+            // Validasi array details jika ada
+            'details'   => 'nullable|array',
+            'details.*.id' => 'required|exists:transaction_details,id',
+            'details.*.price' => 'required|numeric|min:0',
         ]);
 
+        // 2. Update Status & Driver
         $transaction->status = $validated['status'];
-
         if ($request->has('driver_id')) {
             $transaction->driver_id = $validated['driver_id'];
         }
 
+        // 3. Update Harga Item (Jika ada perubahan harga)
+        if ($request->has('details')) {
+            foreach ($request->details as $item) {
+                // Update harga per item di tabel transaction_details
+                $transaction->details()
+                    ->where('id', $item['id'])
+                    ->update(['price' => $item['price']]);
+            }
+
+            // HITUNG ULANG TOTAL TRANSAKSI
+            // Ambil data terbaru dari db untuk menghitung total yang akurat
+            $newTotal = $transaction->details()->get()->sum(function ($detail) {
+                return $detail->price * $detail->quantity;
+            });
+            
+            $transaction->total_amount = $newTotal;
+        }
+
         $transaction->save();
 
-        // --- PERBAIKAN UTAMA DI SINI ---
-        // Kita paksa muat ulang data Driver & User supaya Frontend langsung tahu namanya
-        $transaction->load(['driver', 'user']);
-        // -------------------------------
+        // 4. Load relasi agar data frontend lengkap
+        $transaction->load(['driver', 'user', 'details.product']);
 
         return response()->json([
             'message' => 'Transaksi berhasil diperbarui',
-            // Kembalikan via Resource agar formatnya konsisten (ada nama driver, tanggal, dll)
-            'data' => new TransactionResource($transaction)
+            'data'    => new TransactionResource($transaction)
         ]);
     }
 

@@ -15,14 +15,16 @@ class UserController extends Controller
      * List Semua User (Admin)
      * Method ini menangani error 500 sebelumnya.
      */
-    public function index() {
+    public function index()
+    {
         return response()->json(User::all());
     }
 
     /**
      * List Khusus Driver (Agar Admin tau ID nya)
      */
-    public function getDrivers() {
+    public function getDrivers()
+    {
         $drivers = User::where('role', 'driver')->get();
         return response()->json($drivers);
     }
@@ -45,12 +47,12 @@ class UserController extends Controller
         $user = $request->user();
 
         $validated = $request->validate([
-            'name'    => 'required|string|max:255',
+            'name' => 'required|string|max:255',
             // email optional: jika mau boleh update email, aktifkan:
             // 'email' => 'required|email|unique:users,email,' . $user->id,
 
             // kalau tabel kamu pakai phone:
-            'phone'   => 'nullable|string|max:30',
+            'phone' => 'nullable|string|max:30',
 
             // kalau tabel kamu pakai no_hp, aktifkan ini dan matikan phone:
             // 'no_hp' => 'nullable|string|max:30',
@@ -140,17 +142,17 @@ class UserController extends Controller
 
         // Validasi Manual di sini agar praktis (tanpa buat file Request baru)
         $validated = $request->validate([
-            'name'     => 'required|string|max:255',
+            'name' => 'required|string|max:255',
             // Email harus unik, KECUALI milik user ini sendiri
-            'email'    => 'required|email|unique:users,email,' . $user->id,
-            'role'     => 'required|in:admin,kasir,driver,pembeli',
+            'email' => 'required|email|unique:users,email,' . $user->id,
+            'role' => 'required|in:admin,kasir,driver,pembeli',
             'password' => 'nullable|string|min:8', // Password opsional saat edit
         ]);
 
         // Update data dasar
-        $user->name  = $validated['name'];
+        $user->name = $validated['name'];
         $user->email = $validated['email'];
-        $user->role  = $validated['role'];
+        $user->role = $validated['role'];
 
         // Cek apakah admin mengisi password baru?
         if ($request->filled('password')) {
@@ -161,7 +163,7 @@ class UserController extends Controller
 
         return response()->json([
             'message' => 'Data user berhasil diperbarui',
-            'data'    => $user
+            'data' => $user
         ]);
     }
 }

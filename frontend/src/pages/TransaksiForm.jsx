@@ -3,480 +3,219 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import api from "../services/api";
 
-const STATUS_OPTIONS = [
-    "pending",
-    "paid",
-    "processing",
-    "shipping",
-    "completed",
-    "cancelled",
-];
+// ... (Helper functions formatRupiah, formatDateTime, dll tetap sama) ...
+const STATUS_OPTIONS = ["pending", "paid", "processing", "shipping", "completed", "cancelled"];
 
-// Helper Format Rupiah
 function formatRupiah(n) {
-    const num = Number(n || 0);
-    return new Intl.NumberFormat("id-ID", {
-        style: "currency",
-        currency: "IDR",
-        maximumFractionDigits: 0,
-    }).format(num);
+  const num = Number(n || 0);
+  return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(num);
 }
 
-// Helper Format Tanggal
 function formatDateTime(ts) {
-    if (!ts) return "-";
-    const d = new Date(ts);
-    if (Number.isNaN(d.getTime())) return String(ts);
-    return new Intl.DateTimeFormat("id-ID", {
-        dateStyle: "medium",
-        timeStyle: "short",
-    }).format(d);
+  if (!ts) return "-";
+  const d = new Date(ts);
+  return Number.isNaN(d.getTime()) ? String(ts) : new Intl.DateTimeFormat("id-ID", { dateStyle: "medium", timeStyle: "short" }).format(d);
 }
 
-// Helper Gambar Backend
-const getImageUrl = (path) => {
-    if (!path) return null;
-    return `http://127.0.0.1:8000/storage/${path}`;
-};
+const getImageUrl = (path) => path ? `http://127.0.0.1:8000/storage/${path}` : null;
 
 function StatusPill({ value }) {
-    // Mapping 'completed' backend ke 'done' jika perlu
-    const displayVal = value === "completed" ? "done" : value;
-
-    let colorClass = "bg-slate-50 text-slate-700 border-slate-200";
-    if (value === "paid")
-        colorClass = "bg-emerald-50 text-emerald-700 border-emerald-200";
-    if (value === "shipping")
-        colorClass = "bg-blue-50 text-blue-700 border-blue-200";
-    if (value === "completed" || value === "done")
-        colorClass = "bg-indigo-50 text-indigo-700 border-indigo-200";
-
-    return (
-        <span
-            className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border ${colorClass}`}
-        >
-            {displayVal}
-        </span>
-    );
+  const displayVal = value === 'completed' ? 'done' : value;
+  let color = "bg-slate-50 text-slate-700";
+  if (value === 'paid') color = "bg-emerald-50 text-emerald-700 border-emerald-200";
+  if (value === 'shipping') color = "bg-blue-50 text-blue-700 border-blue-200";
+  if (value === 'completed') color = "bg-indigo-50 text-indigo-700 border-indigo-200";
+  return <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border ${color}`}>{displayVal}</span>;
 }
 
 export default function TransaksiForm() {
-    const { id } = useParams();
-    const navigate = useNavigate();
+  const { id } = useParams();
+  const navigate = useNavigate();
 
-    // --- STATE ---
-    const [trx, setTrx] = useState(null);
-    const [drivers, setDrivers] = useState([]);
+  const [trx, setTrx] = useState(null);
+  const [drivers, setDrivers] = useState([]);
+  const [status, setStatus] = useState("pending");
+  const [driverId, setDriverId] = useState("");
+  const [loading, setLoading] = useState(true);
 
-    const [status, setStatus] = useState("pending");
-    const [driverId, setDriverId] = useState("");
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const resDriver = await api.get('/drivers');
+        setDrivers(Array.isArray(resDriver.data) ? resDriver.data : (resDriver.data.data || []));
 
-    const [loading, setLoading] = useState(true);
+        const resTrx = await api.get(`/transactions/${id}`);
+        const found = resTrx.data.data;
 
-    // --- 1. FETCH DATA (Drivers & Transaksi) ---
-    useEffect(() => {
-        const fetchData = async () => {
-            try {
-                setLoading(true);
+        if (found) {
+          found.buyer = found.user || { name: 'Guest', email: '-' };
+          
+          if (found.details) {
+             found.details = found.details.map(d => {
+               // LOGIKA PERBAIKAN HARGA:
+               // 1. Ambil harga snapshot transaksi (d.price)
+               // 2. Jika 0/null, cari di d.product.price
+               let finalPrice = Number(d.price);
+               
+               if (finalPrice === 0 && d.product) {
+                   finalPrice = Number(d.product.price);
+               }
 
-                // A. Ambil Drivers
-                const resDriver = await api.get("/drivers");
-                // Handle format array atau {data: [...]}
-                const driversList = Array.isArray(resDriver.data)
-                    ? resDriver.data
-                    : resDriver.data.data || [];
-                setDrivers(driversList);
+               return {
+                 ...d,
+                 // Pastikan nama produk muncul
+                 product_name: d.product?.name || d.product_name || 'Produk dihapus',
+                 // Simpan harga hasil kalkulasi agar tabel tinggal render
+                 calculated_price: finalPrice
+               };
+             });
+          }
 
-                // B. Ambil Transaksi Spesifik
-                // Pastikan endpoint backend show($id) sudah dibuat sesuai Langkah 2A
-                const resTrx = await api.get(`/transactions/${id}`);
-                const found = resTrx.data.data; // Laravel Resource membungkus dengan 'data'
-
-                if (found) {
-                    // --- LOGGING DEBUG: Cek di Console Browser (F12) ---
-                    console.log("Data Transaksi Lengkap:", found);
-                    console.log("User/Pembeli:", found.user);
-                    console.log("Tanggal:", found.created_at);
-                    // ---------------------------------------------------
-
-                    // 1. Perbaikan Nama Pembeli (Fallback ke 'user' jika 'buyer' kosong)
-                    found.buyer = found.user ||
-                        found.buyer || { name: "Guest (No Data)", email: "-" };
-
-                    // 2. Perbaikan Tanggal (Pastikan tidak null)
-                    if (!found.created_at)
-                        console.warn(
-                            "Tanggal created_at masih kosong dari backend!"
-                        );
-
-                    // 3. Perbaikan Detail Item
-                    if (found.details) {
-                        found.details = found.details.map((d) => ({
-                            ...d,
-                            // Cek 'product' atau 'product_name' tergantung resource
-                            product_name:
-                                d.product?.name ||
-                                d.product_name ||
-                                "Produk dihapus",
-                        }));
-                    }
-
-                    setTrx(found);
-                    setStatus(
-                        found.status === "completed" ? "done" : found.status
-                    );
-                    setDriverId(found.driver_id ? String(found.driver_id) : "");
-                }
-            } catch (err) {
-                console.error("Gagal ambil data:", err);
-                // Jika 404, kembali ke list
-                if (err.response && err.response.status === 404) {
-                    navigate("/dashboard/transaksi");
-                }
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        if (id) fetchData();
-    }, [id, navigate]);
-
-    // Preview Driver yang dipilih
-    const assignedDriver = useMemo(() => {
-        if (!driverId) return null;
-        return drivers.find((d) => String(d.id) === String(driverId)) || null;
-    }, [driverId, drivers]);
-
-    // Hitung Subtotal
-    const detailsSubtotal = useMemo(() => {
-        if (!trx?.details?.length) return 0;
-        return trx.details.reduce(
-            (acc, it) => acc + Number(it.price || 0) * Number(it.quantity || 0),
-            0
-        );
-    }, [trx]);
-    // --- 2. LOGIKA SIMPAN (REVISI FINAL) ---
-    const onSave = async (e) => {
-        e.preventDefault();
-        if (!trx) return;
-
-        try {
-            // Mapping Status 'done' -> 'completed' (backend)
-            const targetStatus = status === "done" ? "completed" : status;
-            const currentStatus = trx.status;
-
-            // Skenario 1: Verifikasi Pembayaran (Paid -> Processing)
-            if (targetStatus === "processing" && currentStatus === "paid") {
-                await api.post(`/transaction/${id}/verify`);
-                alert("Pembayaran diverifikasi (System Flow)");
-            }
-            // Skenario 2: Assign Driver (Processing -> Shipping)
-            else if (
-                targetStatus === "shipping" &&
-                currentStatus === "processing"
-            ) {
-                if (!driverId) return alert("Pilih driver dulu!");
-                await api.post(`/transaction/${id}/assign`, {
-                    driver_id: driverId,
-                });
-                alert("Driver ditugaskan (System Flow)");
-            }
-            // Skenario 3: Selesai Langsung/Ambil Sendiri (Shipping -> Completed)
-            // Note: Endpoint complete-direct biasanya untuk 'Ambil di tempat' tanpa driver
-            else if (
-                targetStatus === "completed" &&
-                currentStatus === "shipping" &&
-                !trx.driver_id
-            ) {
-                await api.post(`/transaction/${id}/complete-direct`);
-                alert("Transaksi selesai (Ambil Sendiri)");
-            }
-
-            // --- SKENARIO 4: UPDATE MANUAL / PAKSA (FALLBACK) ---
-            // Jika tidak masuk skenario di atas (misal: koreksi status, ganti driver, cancel)
-            // Kita pakai endpoint PUT umum yang baru dibuat.
-            else {
-                await api.put(`/transactions/${id}`, {
-                    status: targetStatus,
-                    driver_id: driverId || null, // Kirim null jika kosong
-                });
-                alert("Data berhasil diperbarui secara manual.");
-            }
-
-            // Kembali ke dashboard
-            navigate("/dashboard/transaksi");
-        } catch (err) {
-            console.error(err);
-            alert(err.response?.data?.message || "Gagal menyimpan perubahan.");
+          setTrx(found);
+          setStatus(found.status === 'completed' ? 'done' : found.status);
+          setDriverId(found.driver_id ? String(found.driver_id) : "");
+        } else {
+          navigate("/dashboard/transaksi", { replace: true });
         }
+      } catch (err) {
+        console.error("Gagal ambil data", err);
+        navigate("/dashboard/transaksi", { replace: true });
+      } finally {
+        setLoading(false);
+      }
     };
-    // --- RENDER ---
+    if(id) fetchData();
+  }, [id, navigate]);
 
-    if (loading) {
-        return (
-            <div className="flex h-64 items-center justify-center">
-                <div className="text-slate-500 animate-pulse">
-                    Memuat data transaksi...
-                </div>
-            </div>
-        );
+  const assignedDriver = useMemo(() => {
+    if (!driverId) return null;
+    return drivers.find((d) => String(d.id) === String(driverId)) || null;
+  }, [driverId, drivers]);
+
+  const onSave = async (e) => {
+    e.preventDefault();
+    if(!trx) return;
+    try {
+      const apiStatus = status === 'done' ? 'completed' : status;
+      await api.put(`/transactions/${id}`, { status: apiStatus, driver_id: driverId || null });
+      alert("Berhasil disimpan!");
+      navigate("/dashboard/transaksi");
+    } catch (err) {
+      alert("Gagal update.");
     }
+  };
 
-    // Jika redirect belum jalan tapi data null (safety)
-    if (!trx) return null;
+  if (loading) return <div className="p-10 text-center text-slate-500">Memuat...</div>;
+  if (!trx) return null;
 
-    return (
-        <div className="space-y-4">
-            {/* Top bar */}
-            <div className="flex items-center justify-between">
-                <div>
-                    <h3 className="text-lg font-semibold text-slate-800">
-                        Transaksi {trx.invoice_code}
-                    </h3>
-                    <p className="text-sm text-slate-500">
-                        Detail transaksi + update status & assign driver.
-                    </p>
-                </div>
-
-                <button
-                    type="button"
-                    onClick={() => navigate(-1)}
-                    className="px-4 py-2 rounded-lg border bg-white hover:bg-slate-50 transition text-sm"
-                >
-                    Kembali
-                </button>
-            </div>
-
-            {/* Summary cards */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                <div className="bg-white border rounded-2xl shadow-sm p-5">
-                    <div className="text-xs text-slate-500">Invoice</div>
-                    <div className="mt-1 text-base font-semibold text-slate-800">
-                        {trx.invoice_code}
-                    </div>
-                    <div className="mt-3 text-xs text-slate-500">Tanggal</div>
-                    <div className="mt-1 text-sm text-slate-700">
-                        {formatDateTime(trx.created_at)}
-                    </div>
-                    <div className="mt-3 text-xs text-slate-500">
-                        Status saat ini
-                    </div>
-                    <div className="mt-1">
-                        <StatusPill value={trx.status} />
-                    </div>
-                </div>
-
-                <div className="bg-white border rounded-2xl shadow-sm p-5">
-                    <div className="text-xs text-slate-500">Pembeli</div>
-                    <div className="mt-1 text-sm font-medium text-slate-800">
-                        {trx.buyer?.name}
-                    </div>
-                    <div className="mt-1 text-xs text-slate-500">
-                        {trx.buyer?.email}
-                    </div>
-                    <div className="mt-1 text-xs text-slate-400 italic">
-                        {trx.address || "Alamat tidak tersedia"}
-                    </div>
-
-                    <div className="mt-4 text-xs text-slate-500">Total</div>
-                    <div className="mt-1 text-base font-semibold text-slate-800">
-                        {formatRupiah(trx.total_amount)}
-                    </div>
-                    <div className="mt-1 text-xs text-slate-500">
-                        Subtotal item: {formatRupiah(detailsSubtotal)}
-                    </div>
-                </div>
-
-                <div className="bg-white border rounded-2xl shadow-sm p-5">
-                    <div className="text-xs text-slate-500">Bukti</div>
-                    <div className="mt-2 grid grid-cols-2 gap-3">
-                        <div className="rounded-xl border p-3 bg-slate-50 flex flex-col items-center">
-                            <div className="text-xs text-slate-500 mb-1">
-                                Pembayaran
-                            </div>
-                            {trx.payment_proof ? (
-                                <a
-                                    href={getImageUrl(trx.payment_proof)}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="text-xs text-sky-600 underline"
-                                >
-                                    Lihat Foto
-                                </a>
-                            ) : (
-                                <span className="text-xs text-slate-400">
-                                    Belum ada
-                                </span>
-                            )}
-                        </div>
-                        <div className="rounded-xl border p-3 bg-slate-50 flex flex-col items-center">
-                            <div className="text-xs text-slate-500 mb-1">
-                                Pengantaran
-                            </div>
-                            {trx.delivery_proof ? (
-                                <a
-                                    href={getImageUrl(trx.delivery_proof)}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="text-xs text-sky-600 underline"
-                                >
-                                    Lihat Foto
-                                </a>
-                            ) : (
-                                <span className="text-xs text-slate-400">
-                                    Belum ada
-                                </span>
-                            )}
-                        </div>
-                    </div>
-
-                    <div className="mt-4 text-xs text-slate-500">
-                        Driver saat ini
-                    </div>
-                    <div className="mt-1 text-sm text-slate-700">
-                        {trx.driver ? trx.driver.name : "- Belum ada driver -"}
-                    </div>
-                </div>
-            </div>
-
-            {/* Details table */}
-            <div className="bg-white border rounded-2xl shadow-sm overflow-hidden">
-                <div className="px-5 py-4 border-b">
-                    <h4 className="font-semibold text-slate-800">
-                        Detail Item
-                    </h4>
-                    <p className="text-sm text-slate-500">
-                        Daftar item yang dibeli dalam transaksi ini.
-                    </p>
-                </div>
-
-                <div className="overflow-x-auto">
-                    <table className="min-w-[800px] w-full text-sm">
-                        <thead className="bg-slate-50 border-b">
-                            <tr className="text-left text-slate-600">
-                                <th className="px-4 py-3 w-16">No</th>
-                                <th className="px-4 py-3">Produk</th>
-                                <th className="px-4 py-3 w-28">Qty</th>
-                                <th className="px-4 py-3 w-40">Harga</th>
-                                <th className="px-4 py-3 w-40">Subtotal</th>
-                            </tr>
-                        </thead>
-
-                        <tbody>
-                            {trx.details &&
-                                trx.details.map((it, idx) => {
-                                    const qty = Number(it.quantity || 0);
-                                    const price = Number(it.price || 0);
-                                    return (
-                                        <tr
-                                            key={it.id || idx}
-                                            className="border-b last:border-b-0"
-                                        >
-                                            <td className="px-4 py-3">
-                                                {idx + 1}
-                                            </td>
-                                            <td className="px-4 py-3">
-                                                <div className="font-medium text-slate-800">
-                                                    {it.product_name}
-                                                </div>
-                                                <div className="text-xs text-slate-500">
-                                                    ID Produk: {it.product_id}
-                                                </div>
-                                            </td>
-                                            <td className="px-4 py-3">{qty}</td>
-                                            <td className="px-4 py-3">
-                                                {formatRupiah(price)}
-                                            </td>
-                                            <td className="px-4 py-3">
-                                                {formatRupiah(price * qty)}
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            {/* Update form */}
-            <form
-                onSubmit={onSave}
-                className="bg-white border rounded-2xl shadow-sm p-5"
-            >
-                <h4 className="font-semibold text-slate-800">
-                    Update Transaksi
-                </h4>
-                <p className="text-sm text-slate-500 mt-1">
-                    Kasir/Admin dapat mengubah status dan memilih driver secara
-                    manual.
-                </p>
-
-                <div className="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    <div>
-                        <label className="text-sm font-medium text-slate-700">
-                            Status
-                        </label>
-                        <select
-                            value={status}
-                            onChange={(e) => setStatus(e.target.value)}
-                            className="mt-2 w-full px-4 py-2.5 rounded-xl border bg-white outline-none focus:ring-2 focus:ring-sky-200"
-                        >
-                            {STATUS_OPTIONS.map((s) => (
-                                <option key={s} value={s}>
-                                    {s}
-                                </option>
-                            ))}
-                        </select>
-                        <p className="mt-2 text-xs text-slate-500">
-                            Saran alur: pending → paid → processing → shipping →
-                            completed
-                        </p>
-                    </div>
-
-                    <div>
-                        <label className="text-sm font-medium text-slate-700">
-                            Assign Driver
-                        </label>
-                        <select
-                            value={driverId}
-                            onChange={(e) => setDriverId(e.target.value)}
-                            className="mt-2 w-full px-4 py-2.5 rounded-xl border bg-white outline-none focus:ring-2 focus:ring-sky-200"
-                        >
-                            <option value="">— Belum ditentukan —</option>
-                            {drivers.map((d) => (
-                                <option key={d.id} value={String(d.id)}>
-                                    {d.name} ({d.email})
-                                </option>
-                            ))}
-                        </select>
-
-                        <div className="mt-2 text-xs text-slate-500">
-                            Preview:{" "}
-                            <span className="font-medium text-slate-700">
-                                {assignedDriver
-                                    ? assignedDriver.name
-                                    : "Belum ada driver"}
-                            </span>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="mt-5 flex items-center justify-end gap-2">
-                    <button
-                        type="button"
-                        onClick={() => navigate("/dashboard/transaksi")}
-                        className="px-4 py-2 rounded-lg border bg-white hover:bg-slate-50 transition text-sm"
-                    >
-                        Batal
-                    </button>
-                    <button
-                        type="submit"
-                        className="px-4 py-2 rounded-lg bg-sky-600 text-white hover:bg-sky-700 transition text-sm"
-                    >
-                        Simpan Perubahan
-                    </button>
-                </div>
-            </form>
+  return (
+    <div className="space-y-4">
+      {/* HEADER */}
+      <div className="flex justify-between items-center">
+        <div>
+            <h3 className="text-lg font-semibold text-slate-800">Transaksi {trx.invoice_code}</h3>
+            <p className="text-sm text-slate-500">Detail & Update Status</p>
         </div>
-    );
+        <button onClick={() => navigate(-1)} className="px-4 py-2 border rounded-lg bg-white hover:bg-slate-50 text-sm">Kembali</button>
+      </div>
+
+      {/* CARDS */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="bg-white border p-5 rounded-2xl shadow-sm">
+            <div className="text-xs text-slate-500">Invoice</div>
+            <div className="font-bold text-slate-800 text-lg mt-1">{trx.invoice_code}</div>
+            <div className="text-xs text-slate-500 mt-2">Tanggal</div>
+            <div className="text-sm">{formatDateTime(trx.created_at)}</div>
+            <div className="mt-2"><StatusPill value={trx.status} /></div>
+        </div>
+        <div className="bg-white border p-5 rounded-2xl shadow-sm">
+            <div className="text-xs text-slate-500">Pembeli</div>
+            <div className="font-medium text-slate-800">{trx.buyer.name}</div>
+            <div className="text-xs text-slate-500">{trx.buyer.email}</div>
+            <div className="text-xs text-slate-400 mt-1 italic">{trx.address}</div>
+            <div className="text-xs text-slate-500 mt-4">Total Akhir</div>
+            <div className="font-bold text-slate-800 text-lg">{formatRupiah(trx.total_amount)}</div>
+        </div>
+        <div className="bg-white border p-5 rounded-2xl shadow-sm">
+            <div className="text-xs text-slate-500 mb-2">Driver</div>
+            <div className="text-sm font-medium">{trx.driver ? trx.driver.name : "-"}</div>
+            <div className="text-xs text-slate-500 mt-4 mb-2">Bukti</div>
+            <div className="flex gap-2">
+                <div className="border p-2 rounded text-center w-full">
+                    <span className="block text-[10px] text-slate-400">Bayar</span>
+                    {trx.payment_proof ? <a href={getImageUrl(trx.payment_proof)} target="_blank" className="text-xs text-blue-600 underline">Lihat</a> : "-"}
+                </div>
+                <div className="border p-2 rounded text-center w-full">
+                    <span className="block text-[10px] text-slate-400">Terima</span>
+                    {trx.delivery_proof ? <a href={getImageUrl(trx.delivery_proof)} target="_blank" className="text-xs text-blue-600 underline">Lihat</a> : "-"}
+                </div>
+            </div>
+        </div>
+      </div>
+
+      {/* TABEL ITEM (Dengan Harga Calculated) */}
+      <div className="bg-white border rounded-2xl shadow-sm overflow-hidden">
+        <div className="px-5 py-4 border-b font-semibold text-slate-800">Detail Item</div>
+        <div className="overflow-x-auto">
+            <table className="w-full text-sm text-left">
+                <thead className="bg-slate-50 border-b text-slate-600">
+                    <tr>
+                        <th className="px-4 py-3 w-10">No</th>
+                        <th className="px-4 py-3">Produk</th>
+                        <th className="px-4 py-3 w-24">Qty</th>
+                        <th className="px-4 py-3 w-32">Harga</th>
+                        <th className="px-4 py-3 w-32">Subtotal</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {trx.details && trx.details.map((it, idx) => (
+                        <tr key={idx} className="border-b last:border-0 hover:bg-slate-50">
+                            <td className="px-4 py-3">{idx + 1}</td>
+                            <td className="px-4 py-3 font-medium">{it.product_name}</td>
+                            <td className="px-4 py-3">{it.quantity}</td>
+                            {/* Tampilkan Harga yang sudah dihitung di useEffect */}
+                            <td className="px-4 py-3 text-slate-700">{formatRupiah(it.calculated_price)}</td>
+                            {/* Hitung Subtotal Realtime */}
+                            <td className="px-4 py-3 font-medium text-slate-800">
+                                {formatRupiah(it.calculated_price * it.quantity)}
+                            </td>
+                        </tr>
+                    ))}
+                </tbody>
+                <tfoot className="bg-slate-50 font-bold text-slate-800">
+                    <tr>
+                        <td colSpan={4} className="px-4 py-3 text-right">Total Akhir:</td>
+                        <td className="px-4 py-3 text-sky-700">{formatRupiah(trx.total_amount)}</td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+      </div>
+
+      {/* FORM UPDATE */}
+      <form onSubmit={onSave} className="bg-white border rounded-2xl shadow-sm p-5">
+        <h4 className="font-semibold mb-4">Update Status</h4>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div>
+                <label className="text-sm font-medium">Status</label>
+                <select value={status} onChange={e => setStatus(e.target.value)} className="w-full mt-1 border rounded-lg px-3 py-2">
+                    {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s.toUpperCase()}</option>)}
+                </select>
+            </div>
+            <div>
+                <label className="text-sm font-medium">Driver</label>
+                <select value={driverId} onChange={e => setDriverId(e.target.value)} className="w-full mt-1 border rounded-lg px-3 py-2">
+                    <option value="">- Pilih -</option>
+                    {drivers.map(d => <option key={d.id} value={String(d.id)}>{d.name}</option>)}
+                </select>
+            </div>
+        </div>
+        <div className="flex justify-end gap-2">
+            <button type="button" onClick={() => navigate("/dashboard/transaksi")} className="px-4 py-2 border rounded-lg hover:bg-slate-50">Batal</button>
+            <button type="submit" className="px-4 py-2 bg-sky-600 text-white rounded-lg hover:bg-sky-700">Simpan</button>
+        </div>
+      </form>
+    </div>
+  );
 }

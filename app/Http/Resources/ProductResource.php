@@ -12,12 +12,10 @@ class ProductResource extends JsonResource
         return [
             'id' => $this->id,
             'name' => $this->name,
-            // Kita bisa format harga langsung jadi Rupiah di sini
-            'price_formatted' => 'Rp ' . number_format($this->price, 0, ',', '.'),
-            'price' => $this->price, // Tetap kirim angka murni untuk kalkulasi
+            'price' => $this->price, // Pastikan ini ada!
             'stock' => $this->stock,
-            'image_url' => $this->image ? url('storage/' . $this->image) : null,
-            'description' => $this->description,
+            'image' => $this->image,
+            'description' => $this->description ?? '',
         ];
     }
 }

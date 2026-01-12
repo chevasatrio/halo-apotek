@@ -10,38 +10,39 @@ class CartController extends Controller
 {
     // Tambah ke Keranjang
     public function addToCart(Request $request)
-{
-    $request->validate([
-        'product_id' => 'required',
-        'quantity' => 'required|integer|min:1'
-    ]);
-
-    $userId = auth()->id();
-    $productId = $request->product_id;
-    $qty = (int) $request->quantity;
-
-    $cart = Cart::where('user_id', $userId)
-        ->where('product_id', $productId)
-        ->first();
-
-    if ($cart) {
-        // kalau sudah ada, baru ditambah
-        $cart->increment('quantity', $qty);
-        $cart->refresh();
-    } else {
-        // kalau belum ada, set pertama kali = qty (biasanya 1)
-        $cart = Cart::create([
-            'user_id' => $userId,
-            'product_id' => $productId,
-            'quantity' => $qty,
+    {
+        $request->validate([
+            'product_id' => 'required',
+            'quantity' => 'required|integer|min:1'
         ]);
+
+        $userId = auth()->id();
+        $productId = $request->product_id;
+        $qty = (int) $request->quantity;
+
+        $cart = Cart::where('user_id', $userId)
+            ->where('product_id', $productId)
+            ->first();
+
+        if ($cart) {
+            // kalau sudah ada, baru ditambah
+            $cart->increment('quantity', $qty);
+            $cart->refresh();
+        } else {
+            // kalau belum ada, set pertama kali = qty (biasanya 1)
+            $cart = Cart::create([
+                'user_id' => $userId,
+                'product_id' => $productId,
+                'quantity' => $qty,
+            ]);
+        }
+
+        return response()->json(['message' => 'Masuk keranjang', 'data' => $cart]);
     }
 
-    return response()->json(['message' => 'Masuk keranjang', 'data' => $cart]);
-}
-
     // Lihat Keranjang Saya
-    public function myCart() {
+    public function myCart()
+    {
         $cart = Cart::with('product')->where('user_id', auth()->id())->get();
         return response()->json($cart);
     }

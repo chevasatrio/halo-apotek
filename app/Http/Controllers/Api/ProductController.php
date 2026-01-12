@@ -10,11 +10,13 @@ use Illuminate\Support\Facades\Storage;
 
 class ProductController extends Controller
 {
-    public function index() {
+    public function index()
+    {
         return response()->json(Product::all());
     }
 
-    public function store(Request $request) {
+    public function store(Request $request)
+    {
         // Validasi simpel
         $request->validate([
             'name' => 'required',
@@ -66,14 +68,14 @@ class ProductController extends Controller
     }
 
     // Fitur: Detail Produk (untuk Edit)
-public function show($id)
-{
-    $product = Product::findOrFail($id);
+    public function show($id)
+    {
+        $product = Product::findOrFail($id);
 
-    return response()->json([
-        'message' => 'Detail produk ditemukan',
-        'data' => new \App\Http\Resources\ProductResource($product)
-    ]);
-}
+        return response()->json([
+            'message' => 'Detail produk ditemukan',
+            'data' => new \App\Http\Resources\ProductResource($product)
+        ]);
+    }
 
 }
